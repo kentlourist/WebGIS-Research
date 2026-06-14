@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WebGIS v2 — Earth Engine Ready</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <!-- Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --bg-primary: #0a0e1a;
+      --bg-secondary: #111827;
+      --bg-panel: #141c2e;
+      --bg-card: #1a2540;
+      --accent-green: #00e5a0;
+      --accent-blue: #3b82f6;
+      --accent-orange: #f59e0b;
+      --accent-red: #ef4444;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #475569;
+      --border: #1e2d45;
+      --border-bright: #2a3f5f;
+      --panel-w: 340px;
+      --header-h: 52px;
+    }
+
+    * { margin:0; padding:0; box-sizing:border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    header {
+      height: var(--header-h);
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 12px;
+      flex-shrink: 0;
+      z-index: 1000;
+    }
+
+    .logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--accent-green);
+      letter-spacing: 0.05em;
+    }
+
+    .header-tabs {
+      display: flex;
+      gap: 2px;
+      flex: 1;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .header-tabs::-webkit-scrollbar { display:none; }
+
+    .tab-btn {
+      padding: 5px 12px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 11.5px;
+      font-family: inherit;
+      cursor: pointer;
+      border-radius: 6px;
+      white-space: nowrap;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tab-btn:hover { background: var(--bg-card); color: var(--text-secondary); }
+    .tab-btn.active {
+      background: var(--bg-card);
+      color: var(--accent-green);
+      border: 1px solid var(--border-bright);
+    }
+
+    .gee-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-left: auto;
+      padding: 4px 10px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent-orange);
+      animation: pulse 2s infinite;
+    }
+    .status-dot.connected { background: var(--accent-green); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* ── MAIN AREA ── */
+    .main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── LEFT PANEL ── */
+    .sidebar {
+      width: var(--panel-w);
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .sidebar-section {
+      border-bottom: 1px solid var(--border);
+      padding: 14px 16px;
+    }
+    .sidebar-section:last-child { border-bottom: none; }
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    /* GEE Connect */
+    .gee-connect-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-bright);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .gee-connect-box p {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+    .btn-gee {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 8px;
+      background: var(--accent-green);
+      color: #0a0e1a;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn-gee:hover { opacity: 0.85; }
+    .btn-gee:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Layer Toggle */
+    .layer-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      overflow-y: auto;
+      max-height: 280px;
+    }
+    .layer-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .layer-item:hover { border-color: var(--border-bright); }
+    .layer-item.active { border-color: var(--accent-green); }
+
+    .layer-toggle {
+      width: 32px; height: 18px;
+      background: var(--bg-secondary);
+      border-radius: 9px;
+      position: relative;
+      cursor: pointer;
+      border: none;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+    .layer-toggle.on { background: var(--accent-green); }
+    .layer-toggle::after {
+      content: '';
+      position: absolute;
+      width: 12px; height: 12px;
+      background: white;
+      border-radius: 50%;
+      top: 3px; left: 3px;
+      transition: transform 0.2s;
+    }
+    .layer-toggle.on::after { transform: translateX(14px); }
+
+    .layer-info { flex: 1; min-width: 0; }
+    .layer-name { font-size: 12px; font-weight: 500; color: var(--text-primary); }
+    .layer-desc { font-size: 10.5px; color: var(--text-muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .layer-color {
+      width: 8px; height: 28px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    /* Opacity slider */
+    .opacity-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .opacity-row label { font-size: 10px; color: var(--text-muted); width: 50px; }
+    .opacity-row input[type=range] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 3px;
+      background: var(--border-bright);
+      border-radius: 2px;
+      outline: none;
+    }
+    .opacity-row input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px; height: 12px;
+      background: var(--accent-green);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .opacity-val { font-size: 10px; color: var(--text-muted); width: 24px; text-align: right; }
+
+    /* GeoJSON Upload */
+    .upload-zone {
+      border: 1.5px dashed var(--border-bright);
+      border-radius: 8px;
+      padding: 14px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .upload-zone:hover, .upload-zone.drag { border-color: var(--accent-green); background: rgba(0,229,160,0.05); }
+    .upload-zone .icon { font-size: 22px; margin-bottom: 6px; }
+    .upload-zone p { font-size: 11.5px; color: var(--text-secondary); }
+    .upload-zone span { font-size: 10.5px; color: var(--text-muted); margin-top: 2px; display: block; }
+    #geojson-input { display: none; }
+
+    .geojson-info {
+      display: none;
+      margin-top: 8px;
+      background: var(--bg-card);
+      border: 1px solid var(--accent-green);
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+    .geojson-info.show { display: block; }
+    .geojson-info p { font-size: 11.5px; color: var(--accent-green); }
+    .geojson-info span { font-size: 10.5px; color: var(--text-muted); }
+
+    .btn-clear {
+      margin-top: 6px;
+      width: 100%;
+      padding: 5px;
+      background: transparent;
+      border: 1px solid var(--border-bright);
+      color: var(--text-secondary);
+      border-radius: 5px;
+      font-size: 11px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .btn-clear:hover { border-color: var(--accent-red); color: var(--accent-red); }
+
+    /* Basemap buttons */
+    .basemap-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .basemap-btn {
+      padding: 7px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .basemap-btn:hover { border-color: var(--border-bright); color: var(--text-primary); }
+    .basemap-btn.active { border-color: var(--accent-blue); color: var(--accent-blue); }
+
+    /* ── MAP ── */
+    #map {
+      flex: 1;
+      position: relative;
+    }
+
+    /* Map overlay info */
+    .map-overlay {
+      position: absolute;
+      bottom: 30px;
+      left: 16px;
+      z-index: 500;
+      background: rgba(10,14,26,0.85);
+      border: 1px solid var(--border-bright);
+      border-radius: 8px;
+      padding: 8px 12px;
+      backdrop-filter: blur(8px);
+      font-size: 11px;
+      color: var(--text-secondary);
+      pointer-events: none;
+    }
+    .map-overlay span { color: var(--text-primary); font-family: 'JetBrains Mono', monospace; }
+
+    .map-badge {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 500;
+      background: rgba(10,14,26,0.9);
+      border: 1px solid var(--border-bright);
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    /* ── RIGHT PANEL ── */
+    .right-panel {
+      width: 300px;
+      background: var(--bg-panel);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .right-panel-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+    .rpanel-tab {
+      flex: 1;
+      padding: 10px 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      transition: color 0.15s;
+      border-bottom: 2px solid transparent;
+    }
+    .rpanel-tab.active { color: var(--accent-green); border-bottom-color: var(--accent-green); }
+
+    .rpanel-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    /* Stats card */
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .stat-card-title {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 7px;
+    }
+    .stat-row:last-child { margin-bottom: 0; }
+    .stat-row .label { font-size: 11.5px; color: var(--text-secondary); }
+    .stat-row .value {
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-primary);
+    }
+    .stat-row .value.green { color: var(--accent-green); }
+    .stat-row .value.orange { color: var(--accent-orange); }
+    .stat-row .value.red { color: var(--accent-red); }
+
+    /* Chart container */
+    .chart-wrap {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .chart-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+    }
+    .chart-wrap canvas { max-height: 160px; }
+
+    /* Legend */
+    .legend-items { display: flex; flex-direction: column; gap: 5px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-secondary); }
+    .legend-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+
+    /* GEE URL input */
+    .gee-url-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-bright);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .gee-url-box p { font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; line-height: 1.5; }
+    .code-block {
+      background: #0a0e1a;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-bottom: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: #7dd3fc;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .input-row { display: flex; gap: 6px; }
+    .url-input {
+      flex: 1;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-bright);
+      border-radius: 5px;
+      padding: 6px 8px;
+      color: var(--text-primary);
+      font-size: 11px;
+      font-family: inherit;
+      outline: none;
+    }
+    .url-input:focus { border-color: var(--accent-green); }
+    .btn-add {
+      padding: 6px 12px;
+      background: var(--accent-green);
+      border: none;
+      border-radius: 5px;
+      color: #0a0e1a;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .btn-add:hover { opacity: 0.85; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-bright);
+      border-left: 3px solid var(--accent-green);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 12px;
+      color: var(--text-primary);
+      z-index: 9999;
+      transform: translateY(80px);
+      opacity: 0;
+      transition: all 0.3s;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.error { border-left-color: var(--accent-red); }
+
+    /* Leaflet dark override */
+    .leaflet-container { background: #0a0e1a; }
+    .leaflet-bar a {
+      background: var(--bg-card) !important;
+      color: var(--text-primary) !important;
+      border-color: var(--border) !important;
+    }
+    .leaflet-bar a:hover { background: var(--bg-secondary) !important; }
+    .leaflet-control-attribution {
+      background: rgba(10,14,26,0.8) !important;
+      color: var(--text-muted) !important;
+      font-size: 9px !important;
+    }
+    .leaflet-popup-content-wrapper {
+      background: var(--bg-card) !important;
+      color: var(--text-primary) !important;
+      border: 1px solid var(--border-bright) !important;
+      border-radius: 8px !important;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important;
+    }
+    .leaflet-popup-tip { background: var(--bg-card) !important; }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 9000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-bright);
+      border-radius: 12px;
+      padding: 24px;
+      width: 460px;
+      max-width: 90vw;
+    }
+    .modal h3 { font-size: 15px; margin-bottom: 6px; }
+    .modal p { font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.6; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .btn-secondary {
+      padding: 7px 14px;
+      background: transparent;
+      border: 1px solid var(--border-bright);
+      color: var(--text-secondary);
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .step-list { counter-reset: steps; padding: 0; }
+    .step-list li {
+      counter-increment: steps;
+      list-style: none;
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .step-list li::before {
+      content: counter(steps);
+      width: 20px; height: 20px;
+      background: var(--accent-green);
+      color: #0a0e1a;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .step-list code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      background: var(--bg-card);
+      padding: 2px 5px;
+      border-radius: 3px;
+      color: #7dd3fc;
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">AJM · WEBGIS</div>
+
+  <div class="header-tabs">
+    <button class="tab-btn active" onclick="switchResearch('drought')">🌵 Kekeringan OKI</button>
+    <button class="tab-btn" onclick="switchResearch('fire')">🔥 dNBR Kebakaran</button>
+    <button class="tab-btn" onclick="switchResearch('uhi')">🌡️ UHI & NDVI</button>
+    <button class="tab-btn" onclick="switchResearch('et')">💧 SEBAL ETa</button>
+    <button class="tab-btn" onclick="switchResearch('flood')">🌊 Banjir Palembang</button>
+    <button class="tab-btn" onclick="switchResearch('rainfall')">🌧️ Curah Hujan Gambut</button>
+    <button class="tab-btn" onclick="switchResearch('lst')">🛰️ MODIS LST</button>
+  </div>
+
+  <div class="gee-status">
+    <div class="status-dot" id="gee-dot"></div>
+    <span id="gee-label">GEE: Belum terhubung</span>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- LEFT SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- GEE Connect -->
+    <div class="sidebar-section">
+      <div class="section-label">Koneksi GEE</div>
+      <div class="gee-connect-box">
+        <p>Hubungkan Google Earth Engine untuk memuat layer spasial hasil analisis Anda secara langsung.</p>
+        <button class="btn-gee" id="btn-gee-connect" onclick="showGeeModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          Hubungkan via GEE App URL
+        </button>
+      </div>
+    </div>
+
+    <!-- Layer Control -->
+    <div class="sidebar-section" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+      <div class="section-label">Layer Aktif</div>
+      <div class="layer-list" id="layer-list">
+        <!-- Populated by JS -->
+      </div>
+
+      <!-- Opacity -->
+      <div class="opacity-row" style="margin-top:10px;">
+        <label>Opacity</label>
+        <input type="range" id="opacity-slider" min="0" max="100" value="80" oninput="updateOpacity(this.value)"/>
+        <span class="opacity-val" id="opacity-val">80%</span>
+      </div>
+    </div>
+
+    <!-- Upload GeoJSON -->
+    <div class="sidebar-section">
+      <div class="section-label">Upload Area Kajian</div>
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('geojson-input').click()"
+           ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+        <div class="icon">📁</div>
+        <p>Upload GeoJSON Area Kajian</p>
+        <span>Drag & drop atau klik untuk memilih file</span>
+      </div>
+      <input type="file" id="geojson-input" accept=".geojson,.json" onchange="loadGeoJSON(this)"/>
+      <div class="geojson-info" id="geojson-info">
+        <p id="geojson-name">—</p>
+        <span id="geojson-desc">—</span>
+        <button class="btn-clear" onclick="clearGeoJSON()">✕ Hapus GeoJSON</button>
+      </div>
+    </div>
+
+    <!-- Basemap -->
+    <div class="sidebar-section">
+      <div class="section-label">Basemap</div>
+      <div class="basemap-grid">
+        <button class="basemap-btn active" onclick="setBasemap('dark')">🌑 Dark</button>
+        <button class="basemap-btn" onclick="setBasemap('satellite')">🛰️ Satellite</button>
+        <button class="basemap-btn" onclick="setBasemap('topo')">🏔️ Topo</button>
+        <button class="basemap-btn" onclick="setBasemap('street')">🗺️ Street</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAP -->
+  <div id="map">
+    <div class="map-badge" id="map-badge">KEKERINGAN OKI · 2015–2024 · MODIS 250m</div>
+    <div class="map-overlay">
+      LAT: <span id="map-lat">—</span> &nbsp; LON: <span id="map-lon">—</span> &nbsp; ZOOM: <span id="map-zoom">8</span>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="right-panel-tabs">
+      <button class="rpanel-tab active" onclick="switchRPanel('stats',this)">Statistik</button>
+      <button class="rpanel-tab" onclick="switchRPanel('chart',this)">Grafik</button>
+      <button class="rpanel-tab" onclick="switchRPanel('geeurl',this)">GEE URL</button>
+    </div>
+
+    <div class="rpanel-content" id="rpanel-stats">
+
+      <div class="stat-card" id="stat-area-card">
+        <div class="stat-card-title" id="stat-title">KEKERINGAN OKI — 2015–2024</div>
+        <div class="stat-row"><span class="label">NDVI Min</span><span class="value red" id="s-ndvi-min">—</span></div>
+        <div class="stat-row"><span class="label">NDVI Maks</span><span class="value green" id="s-ndvi-max">—</span></div>
+        <div class="stat-row"><span class="label">NDVI Rata-rata</span><span class="value" id="s-ndvi-mean">—</span></div>
+        <div class="stat-row"><span class="label">VCI Rata-rata</span><span class="value orange" id="s-vci">—</span></div>
+        <div class="stat-row"><span class="label">Luas Area Studi</span><span class="value" id="s-area">—</span></div>
+        <div class="stat-row"><span class="label">Periode</span><span class="value" id="s-period">—</span></div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-card-title">Legenda Layer</div>
+        <div class="legend-items" id="legend-items">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <div class="stat-card" id="geojson-stat-card" style="display:none;">
+        <div class="stat-card-title">📁 GeoJSON Upload</div>
+        <div class="stat-row"><span class="label">Jumlah Fitur</span><span class="value green" id="gj-feat">—</span></div>
+        <div class="stat-row"><span class="label">Tipe Geometri</span><span class="value" id="gj-type">—</span></div>
+        <div class="stat-row"><span class="label">Extent</span><span class="value" id="gj-extent" style="font-size:10px;">—</span></div>
+      </div>
+    </div>
+
+    <div class="rpanel-content" id="rpanel-chart" style="display:none;">
+      <div class="chart-wrap">
+        <div class="chart-title" id="chart-title-1">Tren NDVI Tahunan (2015–2024)</div>
+        <canvas id="chart-main"></canvas>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-title" id="chart-title-2">Distribusi Kelas Kekeringan</div>
+        <canvas id="chart-class"></canvas>
+      </div>
+    </div>
+
+    <div class="rpanel-content" id="rpanel-geeurl" style="display:none;">
+      <div class="gee-url-box">
+        <p>Tambahkan tile URL dari GEE Code Editor untuk menampilkan layer spasial Anda di peta:</p>
+        <div class="code-block">// GEE Code Editor — tambahkan di akhir script:
+var vis = {min:0, max:1, palette:['red','yellow','green']};
+var tileUrl = ndviLayer.getMap(vis).urlFormat;
+print('Tile URL:', tileUrl);</div>
+        <p>Salin URL dari Console GEE, paste di bawah, beri nama layer:</p>
+        <div style="margin-bottom:6px;">
+          <input class="url-input" id="gee-url-name" placeholder="Nama layer (contoh: NDVI 2024)"/>
+        </div>
+        <div class="input-row">
+          <input class="url-input" id="gee-url-input" placeholder="https://earthengine.googleapis.com/v1alpha/..."/>
+          <button class="btn-add" onclick="addGeeUrlLayer()">＋</button>
+        </div>
+      </div>
+
+      <div style="margin-top:14px;">
+        <div class="section-label">Layer dari GEE URL</div>
+        <div id="custom-layer-list" style="display:flex;flex-direction:column;gap:6px;margin-top:8px;">
+          <p style="font-size:11px;color:var(--text-muted);text-align:center;padding:16px 0;">Belum ada layer. Tambahkan dari GEE URL di atas.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- GEE Modal -->
+<div class="modal-overlay" id="gee-modal">
+  <div class="modal">
+    <h3>🌍 Cara Menampilkan Data Spasial dari GEE</h3>
+    <p>Karena WebGIS ini dihosting di GitHub Pages (static), data GEE harus diambil melalui salah satu dari dua cara berikut:</p>
+    <ol class="step-list">
+      <li>
+        <div>
+          <strong>Via GEE Code Editor (Tile URL):</strong><br/>
+          Di akhir script GEE Anda, tambahkan:<br/>
+          <code>var url = namaLayer.getMap(visParams).urlFormat;</code><br/>
+          <code>print('URL:', url);</code><br/>
+          Lalu salin URL dari Console dan paste di tab <em>"GEE URL"</em> pada panel kanan.
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Via GEE Apps (Rekomendasi):</strong><br/>
+          Publish script Anda sebagai <strong>Earth Engine App</strong>, lalu embed URL-nya. Cara ini tidak perlu menyalin URL setiap sesi.
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Export ke GeoJSON / COG:</strong><br/>
+          Export hasil analisis GEE ke Google Drive sebagai GeoJSON, lalu upload langsung via fitur <em>"Upload Area Kajian"</em> di sidebar kiri.
+        </div>
+      </li>
+    </ol>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeGeeModal()">Tutup</button>
+      <button class="btn-gee" style="width:auto;padding:7px 16px;" onclick="window.open('https://code.earthengine.google.com/','_blank');closeGeeModal();">
+        Buka GEE Code Editor →
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ══════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════
+const state = {
+  currentResearch: 'drought',
+  geeConnected: false,
+  geojsonLayer: null,
+  activeLayers: {},
+  customLayers: {},
+  opacity: 0.8,
+  charts: {}
+};
+
+// ══════════════════════════════════════════════════
+//  RESEARCH CONFIG
+// ══════════════════════════════════════════════════
+const RESEARCH = {
+  drought: {
+    badge: 'KEKERINGAN OKI · 2015–2024 · MODIS 250m',
+    center: [-3.5, 105.5], zoom: 9,
+    statTitle: 'KEKERINGAN OKI — 2015–2024',
+    stats: { ndviMin:'-0.12', ndviMax:'0.78', ndviMean:'0.41', vci:'38.2%', area:'19.023 km²', period:'2015–2024' },
+    layers: [
+      { id:'ndvi', name:'NDVI Komposit', desc:'MODIS MOD13Q1 250m', color:'#22c55e', on:true },
+      { id:'vci', name:'VCI (Drought)', desc:'Vegetation Condition Index', color:'#f59e0b', on:false },
+      { id:'spi', name:'SPI CHIRPS', desc:'Standardized Precipitation', color:'#3b82f6', on:false },
+    ],
+    legend: [
+      { color:'#ef4444', label:'Kekeringan Berat (VCI < 20)' },
+      { color:'#f97316', label:'Kekeringan Sedang (VCI 20–35)' },
+      { color:'#eab308', label:'Kekeringan Ringan (VCI 35–50)' },
+      { color:'#22c55e', label:'Normal (VCI > 50)' },
+    ],
+    chartMain: {
+      label: 'NDVI Rata-rata',
+      labels: ['2015','2016','2017','2018','2019','2020','2021','2022','2023','2024'],
+      data: [0.48,0.31,0.44,0.29,0.52,0.38,0.45,0.33,0.41,0.39],
+      color: '#22c55e',
+      title: 'Tren NDVI Tahunan (2015–2024)'
+    },
+    chartClass: {
+      labels: ['Berat','Sedang','Ringan','Normal'],
+      data: [12, 23, 31, 34],
+      colors: ['#ef4444','#f97316','#eab308','#22c55e'],
+      title: 'Distribusi Kelas Kekeringan (%)'
+    },
+    // GEE tile placeholder — replace with real getMap() URL
+    geeTile: null
+  },
+  fire: {
+    badge: 'KARHUTLA OKI · 2020–2024 · Landsat/Sentinel',
+    center: [-3.8, 105.3], zoom: 9,
+    statTitle: 'KARHUTLA OKI — 2020–2024',
+    stats: { ndviMin:'—', ndviMax:'—', ndviMean:'—', vci:'—', area:'19.023 km²', period:'2020–2024' },
+    layers: [
+      { id:'dnbr', name:'dNBR (Burn Severity)', desc:'Landsat 8/9 OLI', color:'#ef4444', on:true },
+      { id:'hotspot', name:'Hotspot MODIS', desc:'MOD14A1 Thermal Anomaly', color:'#f97316', on:false },
+    ],
+    legend: [
+      { color:'#7f1d1d', label:'High Severity Burn' },
+      { color:'#dc2626', label:'Moderate-High Burn' },
+      { color:'#f97316', label:'Moderate Burn' },
+      { color:'#fde68a', label:'Low Severity Burn' },
+      { color:'#d1fae5', label:'Unburned / Enhanced' },
+    ],
+    chartMain: {
+      label: 'Luas Terbakar (ha)',
+      labels: ['2020','2021','2022','2023','2024'],
+      data: [82400, 13200, 45600, 21800, 37900],
+      color: '#ef4444',
+      title: 'Luas Kebakaran Tahunan (ha)'
+    },
+    chartClass: {
+      labels: ['High','Mod-High','Moderate','Low'],
+      data: [18, 27, 35, 20],
+      colors: ['#7f1d1d','#dc2626','#f97316','#fde68a'],
+      title: 'Distribusi dNBR Kelas (%)'
+    },
+    geeTile: null
+  },
+  uhi: {
+    badge: 'UHI & NDVI · Palembang · Landsat 8/9',
+    center: [-2.99, 104.75], zoom: 11,
+    statTitle: 'UHI & NDVI — Palembang',
+    stats: { ndviMin:'-0.05', ndviMax:'0.61', ndviMean:'0.23', vci:'—', area:'400.6 km²', period:'2020–2024' },
+    layers: [
+      { id:'lst', name:'LST (UHI)', desc:'Land Surface Temperature', color:'#f59e0b', on:true },
+      { id:'ndvi_u', name:'NDVI Urban', desc:'Landsat 8/9', color:'#22c55e', on:false },
+    ],
+    legend: [
+      { color:'#1e40af', label:'< 28°C (Sangat Sejuk)' },
+      { color:'#0ea5e9', label:'28–31°C (Sejuk)' },
+      { color:'#fde68a', label:'31–34°C (Sedang)' },
+      { color:'#f97316', label:'34–37°C (Panas)' },
+      { color:'#7f1d1d', label:'> 37°C (UHI Intens)' },
+    ],
+    chartMain: {
+      label: 'LST Rata-rata (°C)',
+      labels: ['2020','2021','2022','2023','2024'],
+      data: [33.2, 34.1, 32.8, 35.4, 34.9],
+      color: '#f59e0b',
+      title: 'Tren LST Kota Palembang (°C)'
+    },
+    chartClass: {
+      labels: ['Sangat Sejuk','Sejuk','Sedang','Panas','UHI'],
+      data: [5, 15, 32, 30, 18],
+      colors: ['#1e40af','#0ea5e9','#fde68a','#f97316','#7f1d1d'],
+      title: 'Distribusi Kelas Suhu (%)'
+    },
+    geeTile: null
+  },
+  et: {
+    badge: 'SEBAL ETa · OKI Gambut · Landsat',
+    center: [-3.5, 105.5], zoom: 9,
+    statTitle: 'SEBAL ETa — OKI Gambut',
+    stats: { ndviMin:'—', ndviMax:'—', ndviMean:'—', vci:'—', area:'19.023 km²', period:'2020–2024' },
+    layers: [
+      { id:'eta', name:'ETa (SEBAL)', desc:'Evapotranspirasi Aktual', color:'#06b6d4', on:true },
+    ],
+    legend: [
+      { color:'#fff7ed', label:'< 2 mm/hari' },
+      { color:'#7dd3fc', label:'2–4 mm/hari' },
+      { color:'#2563eb', label:'4–6 mm/hari' },
+      { color:'#1e3a5f', label:'> 6 mm/hari' },
+    ],
+    chartMain: {
+      label: 'ETa (mm/hari)',
+      labels: ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'],
+      data: [4.2, 4.0, 3.8, 3.5, 3.2, 2.8, 2.5, 2.3, 2.9, 3.6, 4.1, 4.3],
+      color: '#06b6d4',
+      title: 'Rata-rata ETa Bulanan (mm/hari)'
+    },
+    chartClass: {
+      labels: ['< 2','2–4','4–6','> 6'],
+      data: [8, 35, 42, 15],
+      colors: ['#fff7ed','#7dd3fc','#2563eb','#1e3a5f'],
+      title: 'Distribusi Kelas ETa (%)'
+    },
+    geeTile: null
+  },
+  flood: {
+    badge: 'BANJIR PALEMBANG · SAR Sentinel-1',
+    center: [-2.99, 104.75], zoom: 11,
+    statTitle: 'Banjir Palembang — SAR',
+    stats: { ndviMin:'—', ndviMax:'—', ndviMean:'—', vci:'—', area:'400.6 km²', period:'2021–2024' },
+    layers: [
+      { id:'flood', name:'Genangan Banjir', desc:'Sentinel-1 SAR GRD', color:'#3b82f6', on:true },
+    ],
+    legend: [
+      { color:'#3b82f6', label:'Area Tergenang' },
+      { color:'#93c5fd', label:'Potensi Genangan' },
+      { color:'#1e3a5f', label:'Badan Air Permanen' },
+    ],
+    chartMain: {
+      label: 'Luas Banjir (km²)',
+      labels: ['2021','2022','2023','2024'],
+      data: [45, 28, 63, 39],
+      color: '#3b82f6',
+      title: 'Luas Genangan Banjir Tahunan (km²)'
+    },
+    chartClass: {
+      labels: ['Tergenang','Potensi','Air Permanen','Kering'],
+      data: [12, 18, 8, 62],
+      colors: ['#3b82f6','#93c5fd','#1e3a5f','#94a3b8'],
+      title: 'Distribusi Kelas Penutupan (%)'
+    },
+    geeTile: null
+  },
+  rainfall: {
+    badge: 'CURAH HUJAN GAMBUT · CHIRPS · OKI',
+    center: [-3.5, 105.5], zoom: 9,
+    statTitle: 'Curah Hujan — CHIRPS OKI',
+    stats: { ndviMin:'—', ndviMax:'—', ndviMean:'—', vci:'—', area:'19.023 km²', period:'2000–2024' },
+    layers: [
+      { id:'rain', name:'CHIRPS Rainfall', desc:'5km Daily Precipitation', color:'#818cf8', on:true },
+    ],
+    legend: [
+      { color:'#fef9c3', label:'< 100 mm/bln' },
+      { color:'#86efac', label:'100–200 mm/bln' },
+      { color:'#3b82f6', label:'200–300 mm/bln' },
+      { color:'#1e40af', label:'> 300 mm/bln' },
+    ],
+    chartMain: {
+      label: 'Curah Hujan (mm)',
+      labels: ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'],
+      data: [285, 240, 310, 270, 190, 120, 85, 95, 130, 210, 290, 310],
+      color: '#818cf8',
+      title: 'Rata-rata Curah Hujan Bulanan (mm)'
+    },
+    chartClass: {
+      labels: ['< 100','100–200','200–300','> 300'],
+      data: [15, 25, 35, 25],
+      colors: ['#fef9c3','#86efac','#3b82f6','#1e40af'],
+      title: 'Distribusi Kelas Curah Hujan (%)'
+    },
+    geeTile: null
+  },
+  lst: {
+    badge: 'MODIS LST · MOD11A2 1km · Sumatera Selatan',
+    center: [-3.0, 104.5], zoom: 8,
+    statTitle: 'MODIS LST — Sumatera Selatan',
+    stats: { ndviMin:'—', ndviMax:'—', ndviMean:'—', vci:'—', area:'91.592 km²', period:'2000–2024' },
+    layers: [
+      { id:'modlst', name:'MODIS LST', desc:'MOD11A2 8-Day 1km', color:'#f59e0b', on:true },
+    ],
+    legend: [
+      { color:'#bfdbfe', label:'< 25°C' },
+      { color:'#86efac', label:'25–30°C' },
+      { color:'#fde68a', label:'30–35°C' },
+      { color:'#f97316', label:'35–40°C' },
+      { color:'#7f1d1d', label:'> 40°C' },
+    ],
+    chartMain: {
+      label: 'LST (°C)',
+      labels: ['2000','2005','2010','2015','2020','2024'],
+      data: [29.8, 30.2, 30.7, 31.3, 31.9, 32.4],
+      color: '#f59e0b',
+      title: 'Tren MODIS LST Tahunan (°C)'
+    },
+    chartClass: {
+      labels: ['< 25°C','25–30°C','30–35°C','35–40°C','> 40°C'],
+      data: [5, 28, 42, 20, 5],
+      colors: ['#bfdbfe','#86efac','#fde68a','#f97316','#7f1d1d'],
+      title: 'Distribusi Kelas Suhu MODIS (%)'
+    },
+    geeTile: null
+  }
+};
+
+// ══════════════════════════════════════════════════
+//  MAP INIT
+// ══════════════════════════════════════════════════
+const basemaps = {
+  dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution:'© CartoDB', maxZoom:19 }),
+  satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution:'© Esri', maxZoom:19 }),
+  topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution:'© OpenTopoMap', maxZoom:17 }),
+  street: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 })
+};
+
+const map = L.map('map', {
+  center: [-3.5, 105.5],
+  zoom: 9,
+  zoomControl: true,
+  layers: [basemaps.dark]
+});
+
+map.on('mousemove', e => {
+  document.getElementById('map-lat').textContent = e.latlng.lat.toFixed(5);
+  document.getElementById('map-lon').textContent = e.latlng.lng.toFixed(5);
+});
+map.on('zoom', () => {
+  document.getElementById('map-zoom').textContent = map.getZoom();
+});
+
+// Layer storage
+const geeLayers = {}; // key: layerId → L.tileLayer
+
+// ══════════════════════════════════════════════════
+//  RESEARCH SWITCH
+// ══════════════════════════════════════════════════
+function switchResearch(key) {
+  state.currentResearch = key;
+  const r = RESEARCH[key];
+
+  // Update active tab
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+
+  // Pan map
+  map.setView(r.center, r.zoom);
+
+  // Badge
+  document.getElementById('map-badge').textContent = r.badge;
+
+  // Remove existing GEE layers from map
+  Object.values(geeLayers).forEach(l => { try { map.removeLayer(l); } catch(e){} });
+
+  // Build layer list
+  buildLayerList(r);
+
+  // Stats
+  document.getElementById('stat-title').textContent = r.statTitle;
+  document.getElementById('s-ndvi-min').textContent = r.stats.ndviMin;
+  document.getElementById('s-ndvi-max').textContent = r.stats.ndviMax;
+  document.getElementById('s-ndvi-mean').textContent = r.stats.ndviMean;
+  document.getElementById('s-vci').textContent = r.stats.vci;
+  document.getElementById('s-area').textContent = r.stats.area;
+  document.getElementById('s-period').textContent = r.stats.period;
+
+  // Legend
+  buildLegend(r.legend);
+
+  // Charts
+  buildCharts(r);
+
+  // Add GEE tile if configured
+  if (r.geeTile) {
+    addGeeLayer(r.layers[0].id, r.geeTile, r.layers[0].name);
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  LAYER LIST
+// ══════════════════════════════════════════════════
+function buildLayerList(r) {
+  const el = document.getElementById('layer-list');
+  el.innerHTML = '';
+  r.layers.forEach(layer => {
+    const item = document.createElement('div');
+    item.className = 'layer-item' + (layer.on ? ' active' : '');
+    item.id = 'li-' + layer.id;
+    item.innerHTML = `
+      <div class="layer-color" style="background:${layer.color}"></div>
+      <div class="layer-info">
+        <div class="layer-name">${layer.name}</div>
+        <div class="layer-desc">${layer.desc}</div>
+      </div>
+      <button class="layer-toggle ${layer.on ? 'on' : ''}" id="tog-${layer.id}" onclick="toggleLayer('${layer.id}', this)"></button>
+    `;
+    el.appendChild(item);
+    state.activeLayers[layer.id] = layer.on;
+  });
+}
+
+function toggleLayer(id, btn) {
+  const isOn = btn.classList.toggle('on');
+  const item = document.getElementById('li-' + id);
+  item.classList.toggle('active', isOn);
+  state.activeLayers[id] = isOn;
+
+  if (geeLayers[id]) {
+    if (isOn) map.addLayer(geeLayers[id]);
+    else map.removeLayer(geeLayers[id]);
+  } else {
+    showToast(isOn ? `Layer "${id}" aktif (hubungkan GEE untuk data spasial)` : `Layer "${id}" dinonaktifkan`, isOn ? '' : '');
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  LEGEND
+// ══════════════════════════════════════════════════
+function buildLegend(items) {
+  const el = document.getElementById('legend-items');
+  el.innerHTML = items.map(i => `
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:${i.color}"></div>
+      <span>${i.label}</span>
+    </div>
+  `).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  CHARTS
+// ══════════════════════════════════════════════════
+function buildCharts(r) {
+  // Destroy existing
+  Object.values(state.charts).forEach(c => { if(c) c.destroy(); });
+
+  document.getElementById('chart-title-1').textContent = r.chartMain.title;
+  document.getElementById('chart-title-2').textContent = r.chartClass.title;
+
+  const ctx1 = document.getElementById('chart-main').getContext('2d');
+  state.charts.main = new Chart(ctx1, {
+    type: 'line',
+    data: {
+      labels: r.chartMain.labels,
+      datasets: [{
+        label: r.chartMain.label,
+        data: r.chartMain.data,
+        borderColor: r.chartMain.color,
+        backgroundColor: r.chartMain.color + '22',
+        tension: 0.4,
+        pointRadius: 3,
+        pointBackgroundColor: r.chartMain.color,
+        fill: true,
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:true,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ ticks:{ color:'#475569', font:{size:9} }, grid:{ color:'#1e2d45' } },
+        y:{ ticks:{ color:'#475569', font:{size:9} }, grid:{ color:'#1e2d45' } }
+      }
+    }
+  });
+
+  const ctx2 = document.getElementById('chart-class').getContext('2d');
+  state.charts.class = new Chart(ctx2, {
+    type: 'doughnut',
+    data: {
+      labels: r.chartClass.labels,
+      datasets: [{
+        data: r.chartClass.data,
+        backgroundColor: r.chartClass.colors,
+        borderWidth: 1,
+        borderColor: '#141c2e'
+      }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:true,
+      plugins:{
+        legend:{
+          position:'right',
+          labels:{ color:'#94a3b8', font:{size:9}, boxWidth:12, padding:8 }
+        }
+      }
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════
+//  BASEMAP
+// ══════════════════════════════════════════════════
+function setBasemap(key) {
+  Object.values(basemaps).forEach(b => { try { map.removeLayer(b); } catch(e){} });
+  basemaps[key].addTo(map);
+  basemaps[key].bringToBack();
+
+  document.querySelectorAll('.basemap-btn').forEach(b => b.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+}
+
+// ══════════════════════════════════════════════════
+//  OPACITY
+// ══════════════════════════════════════════════════
+function updateOpacity(val) {
+  state.opacity = val / 100;
+  document.getElementById('opacity-val').textContent = val + '%';
+  Object.values(geeLayers).forEach(l => l.setOpacity(state.opacity));
+  if (state.geojsonLayer) {
+    state.geojsonLayer.setStyle({ opacity: state.opacity, fillOpacity: state.opacity * 0.5 });
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  GEE TILE URL LAYER
+// ══════════════════════════════════════════════════
+function addGeeLayer(id, url, name) {
+  if (geeLayers[id]) {
+    try { map.removeLayer(geeLayers[id]); } catch(e){}
+  }
+  try {
+    const layer = L.tileLayer(url, {
+      opacity: state.opacity,
+      attribution: 'Google Earth Engine',
+      crossOrigin: true,
+      errorTileUrl: ''
+    });
+    layer.on('tileerror', function(e){
+      console.error('GEE Tile Error:', e);
+      try{ showToast('GEE Tile gagal dimuat. Periksa URL / token.', true); }catch(err){}
+    });
+    layer.on('load', function(){
+      console.log('GEE Tile berhasil dimuat');
+    });
+    layer.addTo(map);
+    geeLayers[id] = layer;
+
+    // Update GEE status dot
+    document.getElementById('gee-dot').classList.add('connected');
+    document.getElementById('gee-label').textContent = 'GEE: Terhubung';
+    state.geeConnected = true;
+  } catch(err) {
+    showToast('Gagal memuat tile GEE: ' + err.message, true);
+  }
+}
+
+// Add layer from input
+function addGeeUrlLayer() {
+  const name = document.getElementById('gee-url-name').value.trim() || 'Layer GEE';
+  const url = document.getElementById('gee-url-input').value.trim();
+  if (!url) { showToast('Masukkan URL tile terlebih dahulu', true); return; }
+
+  const id = 'custom_' + Date.now();
+  addGeeLayer(id, url, name);
+
+  // Add to custom list
+  const list = document.getElementById('custom-layer-list');
+  if (list.querySelector('p')) list.innerHTML = '';
+
+  const item = document.createElement('div');
+  item.className = 'layer-item active';
+  item.innerHTML = `
+    <div class="layer-color" style="background:#00e5a0"></div>
+    <div class="layer-info">
+      <div class="layer-name">${name}</div>
+      <div class="layer-desc">GEE Tile Layer</div>
+    </div>
+    <button class="layer-toggle on" onclick="removeCustomLayer('${id}', this.parentElement)"></button>
+  `;
+  list.appendChild(item);
+
+  document.getElementById('gee-url-input').value = '';
+  document.getElementById('gee-url-name').value = '';
+  showToast(`Layer "${name}" berhasil ditambahkan`);
+}
+
+function removeCustomLayer(id, el) {
+  if (geeLayers[id]) { try { map.removeLayer(geeLayers[id]); } catch(e){} delete geeLayers[id]; }
+  el.remove();
+  if (document.getElementById('custom-layer-list').children.length === 0) {
+    document.getElementById('custom-layer-list').innerHTML = '<p style="font-size:11px;color:var(--text-muted);text-align:center;padding:16px 0;">Belum ada layer. Tambahkan dari GEE URL di atas.</p>';
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  GEOJSON UPLOAD
+// ══════════════════════════════════════════════════
+function loadGeoJSON(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const geojson = JSON.parse(e.target.result);
+      displayGeoJSON(geojson, file.name);
+    } catch(err) {
+      showToast('Gagal membaca GeoJSON: Format tidak valid', true);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function displayGeoJSON(geojson, filename) {
+  if (state.geojsonLayer) {
+    map.removeLayer(state.geojsonLayer);
+    state.geojsonLayer = null;
+  }
+
+  // Count features and get geometry type
+  let featCount = 0;
+  let geomType = '—';
+  if (geojson.type === 'FeatureCollection') {
+    featCount = geojson.features.length;
+    if (featCount > 0) geomType = geojson.features[0].geometry?.type || '—';
+  } else if (geojson.type === 'Feature') {
+    featCount = 1;
+    geomType = geojson.geometry?.type || '—';
+  }
+
+  const layer = L.geoJSON(geojson, {
+    style: {
+      color: '#00e5a0',
+      weight: 2,
+      opacity: state.opacity,
+      fillColor: '#00e5a0',
+      fillOpacity: state.opacity * 0.15,
+      dashArray: '4 4'
+    },
+    onEachFeature: (feature, lyr) => {
+      if (feature.properties) {
+        const props = Object.entries(feature.properties)
+          .map(([k,v]) => `<div class="stat-row"><span class="label">${k}</span><span class="value">${v ?? '—'}</span></div>`)
+          .join('');
+        lyr.bindPopup(`<div style="min-width:180px"><div class="stat-card-title" style="margin-bottom:8px">Properties</div>${props}</div>`);
+      }
+    }
+  }).addTo(map);
+
+  state.geojsonLayer = layer;
+  map.fitBounds(layer.getBounds(), { padding: [40, 40] });
+
+  // Get extent
+  const bounds = layer.getBounds();
+  const extentStr = `${bounds.getSouth().toFixed(2)},${bounds.getWest().toFixed(2)} → ${bounds.getNorth().toFixed(2)},${bounds.getEast().toFixed(2)}`;
+
+  // Update info
+  document.getElementById('geojson-info').classList.add('show');
+  document.getElementById('geojson-name').textContent = '✓ ' + filename;
+  document.getElementById('geojson-desc').textContent = `${featCount} fitur · ${geomType}`;
+
+  // Stats card
+  document.getElementById('geojson-stat-card').style.display = 'block';
+  document.getElementById('gj-feat').textContent = featCount;
+  document.getElementById('gj-type').textContent = geomType;
+  document.getElementById('gj-extent').textContent = extentStr;
+
+  showToast(`GeoJSON "${filename}" berhasil dimuat (${featCount} fitur)`);
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.add('drag');
+}
+function handleDragLeave() {
+  document.getElementById('upload-zone').classList.remove('drag');
+}
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  if (!file.name.endsWith('.geojson') && !file.name.endsWith('.json')) {
+    showToast('Hanya file .geojson atau .json yang diterima', true);
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try { displayGeoJSON(JSON.parse(ev.target.result), file.name); }
+    catch { showToast('Gagal membaca GeoJSON', true); }
+  };
+  reader.readAsText(file);
+}
+
+function clearGeoJSON() {
+  if (state.geojsonLayer) { map.removeLayer(state.geojsonLayer); state.geojsonLayer = null; }
+  document.getElementById('geojson-info').classList.remove('show');
+  document.getElementById('geojson-stat-card').style.display = 'none';
+  document.getElementById('geojson-input').value = '';
+  showToast('GeoJSON dihapus dari peta');
+}
+
+// ══════════════════════════════════════════════════
+//  RIGHT PANEL TABS
+// ══════════════════════════════════════════════════
+function switchRPanel(tab, btn) {
+  ['stats','chart','geeurl'].forEach(t => {
+    document.getElementById('rpanel-' + t).style.display = t === tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.rpanel-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ══════════════════════════════════════════════════
+//  GEE MODAL
+// ══════════════════════════════════════════════════
+function showGeeModal() {
+  document.getElementById('gee-modal').classList.add('show');
+}
+function closeGeeModal() {
+  document.getElementById('gee-modal').classList.remove('show');
+}
+
+// ══════════════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════════════
+let toastTimer;
+function showToast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (isError ? ' error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = 'toast'; }, 3000);
+}
+
+// ══════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════
+(function init() {
+  const r = RESEARCH[state.currentResearch];
+  buildLayerList(r);
+  buildLegend(r.legend);
+  buildCharts(r);
+  document.getElementById('map-zoom').textContent = map.getZoom();
+})();
+</script>
+</body>
+</html>
