@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebGIS Dashboard — Aldi Jati Mulya Research</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&family=Syne:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:     #03080f;
+  --panel:  #060e1c;
+  --raised: #0a1628;
+  --accent: #00d4ff;
+  --a2:     #0066ff;
+  --a3:     #00ff88;
+  --warn:   #f59e0b;
+  --danger: #ef4444;
+  --txt:    #e8f4f8;
+  --txt2:   rgba(200,225,240,0.55);
+  --txt3:   rgba(200,225,240,0.28);
+  --border: rgba(0,212,255,0.12);
+  --bhi:    rgba(0,212,255,0.32);
+  --mono:   'Space Mono',monospace;
+  --head:   'Syne',sans-serif;
+  --body:   'DM Sans',sans-serif;
+  --r:      8px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:var(--body);background:var(--bg);color:var(--txt);font-size:13px;display:flex;flex-direction:column;}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:var(--a2);border-radius:2px;}
+
+/* TOPBAR */
+.topbar{height:52px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:12px;flex-shrink:0;z-index:1000;}
+.topbar-logo{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:2px;white-space:nowrap;}
+.sep{width:1px;height:20px;background:var(--border);}
+.topbar-mid{flex:1;display:flex;align-items:center;gap:6px;overflow-x:auto;}
+.proj-tab{font-size:11px;padding:5px 12px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--txt2);cursor:pointer;white-space:nowrap;transition:all .2s;font-family:var(--body);}
+.proj-tab:hover{border-color:var(--bhi);color:var(--accent);}
+.proj-tab.active{background:rgba(0,212,255,0.1);border-color:var(--accent);color:var(--accent);}
+.topbar-right{display:flex;gap:8px;align-items:center;flex-shrink:0;}
+.lang-btn{font-size:11px;padding:4px 10px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--txt3);cursor:pointer;font-family:var(--mono);}
+.lang-btn.active{background:rgba(0,212,255,0.1);color:var(--accent);border-color:var(--accent);}
+.home-btn{font-size:11px;padding:5px 14px;background:var(--accent);color:var(--bg);border:none;border-radius:5px;cursor:pointer;font-weight:500;text-decoration:none;display:inline-block;}
+.live-ind{display:flex;align-items:center;gap:5px;}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--a3);animation:blink 2s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* MAIN */
+.main{display:flex;flex:1;overflow:hidden;}
+
+/* SIDEBAR */
+.sidebar{width:270px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.sidebar-tabs{display:flex;border-bottom:1px solid var(--border);}
+.s-tab{flex:1;padding:9px 4px;font-size:10px;text-align:center;color:var(--txt3);cursor:pointer;border-bottom:2px solid transparent;text-transform:uppercase;letter-spacing:.5px;transition:all .2s;}
+.s-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.scontent{flex:1;overflow-y:auto;padding:12px;}
+
+/* LAYER ITEMS */
+.lg-title{font-family:var(--mono);font-size:10px;color:var(--txt3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid var(--border);margin-top:14px;}
+.lg-title:first-child{margin-top:0;}
+.li{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:6px;border:1px solid transparent;margin-bottom:4px;cursor:pointer;transition:all .2s;}
+.li:hover{border-color:var(--border);background:var(--raised);}
+.li.on{border-color:var(--bhi);background:rgba(0,212,255,0.05);}
+.li-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+.li-lbl{flex:1;font-size:12px;color:var(--txt);}
+.li-src{font-size:9px;color:var(--txt3);}
+.tog{width:28px;height:15px;border-radius:8px;background:var(--raised);border:1px solid var(--border);position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;}
+.tog.on{background:rgba(0,212,255,.2);border-color:var(--accent);}
+.tog::after{content:'';position:absolute;width:9px;height:9px;border-radius:50%;background:var(--txt3);top:2px;left:2px;transition:all .2s;}
+.tog.on::after{background:var(--accent);left:15px;}
+
+/* INFO PANEL */
+.info-panel{padding:12px;border-top:1px solid var(--border);}
+.ip-title{font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:8px;}
+.ip-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.ip-card{background:var(--raised);border:1px solid var(--border);border-radius:6px;padding:8px;text-align:center;}
+.ip-val{font-family:var(--mono);font-size:15px;font-weight:700;}
+.ip-lbl{font-size:9px;color:var(--txt3);margin-top:1px;text-transform:uppercase;letter-spacing:.5px;}
+
+/* PROJECT DESC */
+.proj-desc{background:var(--raised);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:10px;}
+.pd-title{font-size:12px;color:var(--txt);font-weight:500;margin-bottom:4px;}
+.pd-txt{font-size:11px;color:var(--txt2);line-height:1.6;}
+.pd-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px;}
+.chip{font-size:9px;padding:2px 7px;background:rgba(0,212,255,.07);color:rgba(0,212,255,.75);border-radius:3px;}
+
+/* GEE TILE GUIDE */
+.gee-guide{background:rgba(0,255,136,.04);border:1px solid rgba(0,255,136,.15);border-left:3px solid var(--a3);border-radius:6px;padding:10px;margin-bottom:10px;}
+.gg-title{font-size:11px;color:var(--a3);font-weight:500;margin-bottom:6px;display:flex;align-items:center;gap:5px;}
+.gg-code{font-family:var(--mono);font-size:9px;background:var(--bg);color:var(--accent);padding:8px;border-radius:4px;line-height:1.6;overflow-x:auto;white-space:pre;}
+.gg-step{font-size:11px;color:var(--txt2);line-height:1.6;margin-bottom:6px;}
+
+/* MAP AREA */
+.map-area{flex:1;position:relative;display:flex;flex-direction:column;}
+#wmap{flex:1;}
+.leaflet-container{background:#060e1c;}
+
+/* MAP OVERLAYS */
+.map-top{position:absolute;top:10px;left:10px;right:10px;z-index:500;display:flex;justify-content:space-between;pointer-events:none;}
+.map-badge{background:rgba(3,8,15,.88);border:1px solid var(--border);border-radius:6px;padding:8px 12px;backdrop-filter:blur(10px);pointer-events:all;}
+.mb-title{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:1px;}
+.mb-sub{font-size:10px;color:var(--txt3);margin-top:2px;}
+.coords-box{background:rgba(3,8,15,.88);border:1px solid var(--border);border-radius:6px;padding:6px 12px;backdrop-filter:blur(10px);}
+.coords-txt{font-family:var(--mono);font-size:10px;color:var(--txt3);}
+
+.map-bot{position:absolute;bottom:0;left:0;right:0;z-index:500;background:rgba(3,8,15,.82);border-top:1px solid var(--border);display:flex;align-items:center;padding:5px 14px;gap:16px;backdrop-filter:blur(10px);pointer-events:none;}
+.mb-item{font-family:var(--mono);font-size:10px;color:var(--txt3);}
+.mb-item span{color:var(--accent);}
+
+/* LEGEND */
+.map-legend{position:absolute;bottom:32px;right:10px;z-index:500;background:rgba(3,8,15,.92);border:1px solid var(--border);border-radius:8px;padding:12px 14px;min-width:160px;backdrop-filter:blur(10px);}
+.leg-title{font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:8px;}
+.leg-bar{height:8px;border-radius:4px;margin:4px 0;}
+.leg-labs{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--txt3);}
+.leg-item{display:flex;align-items:center;gap:7px;margin-bottom:5px;}
+.leg-sw{width:14px;height:10px;border-radius:2px;flex-shrink:0;}
+.leg-lbl{font-size:10px;color:var(--txt2);}
+
+/* RIGHT PANEL */
+.rpanel{width:270px;flex-shrink:0;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.rp-head{padding:11px 14px;border-bottom:1px solid var(--border);}
+.rp-title{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:1px;}
+.rp-sub{font-size:10px;color:var(--txt3);margin-top:2px;}
+.rp-body{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:12px;}
+
+/* CHART CARDS */
+.cc{background:var(--raised);border:1px solid var(--border);border-radius:var(--r);padding:11px;}
+.cc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.cc-ttl{font-size:11px;color:var(--txt2);}
+.cc-badge{font-size:9px;padding:2px 7px;background:rgba(0,212,255,.1);color:var(--accent);border-radius:3px;}
+.chart-wrap{height:100px;position:relative;}
+
+/* STAT CARDS */
+.stat-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.sc{background:var(--raised);border:1px solid var(--border);border-radius:6px;padding:10px;text-align:center;}
+.sc-val{font-family:var(--mono);font-size:16px;font-weight:700;}
+.sc-lbl{font-size:9px;color:var(--txt3);margin-top:2px;text-transform:uppercase;}
+
+/* ANALYSIS TABLE */
+.atbl{width:100%;border-collapse:collapse;}
+.atbl td{padding:5px 7px;font-size:11px;border-bottom:1px solid var(--border);}
+.atbl td:first-child{color:var(--txt3);}
+.atbl td:last-child{font-family:var(--mono);font-size:11px;text-align:right;}
+.atbl tr:last-child td{border-bottom:none;}
+
+/* SEVERITY BARS */
+.sev-row{display:flex;align-items:center;gap:7px;margin-bottom:5px;}
+.sev-lbl{font-size:10px;color:var(--txt2);min-width:70px;}
+.sev-bg{flex:1;height:3px;background:var(--border);border-radius:2px;}
+.sev-fill{height:3px;border-radius:2px;}
+.sev-val{font-family:var(--mono);font-size:10px;color:var(--accent);min-width:28px;text-align:right;}
+
+/* POPUP */
+.gis-popup .leaflet-popup-content-wrapper{background:#0a1628;border:1px solid rgba(0,212,255,.2);border-radius:8px;color:#e8f4f8;box-shadow:0 4px 20px rgba(0,0,0,.5);}
+.gis-popup .leaflet-popup-tip{background:#0a1628;}
+.pop-title{font-size:12px;font-weight:500;color:#fff;margin-bottom:5px;}
+.pop-row{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid rgba(0,212,255,.08);}
+.pop-key{color:#88aab8;}
+.pop-val{color:#00d4ff;font-family:'Space Mono',monospace;}
+.pop-tag{display:inline-block;margin-top:6px;font-size:9px;padding:2px 7px;background:rgba(0,212,255,.12);color:#00d4ff;border-radius:3px;}
+
+/* BASEMAP GRID */
+.bm-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;}
+.bm-opt{border:1px solid var(--border);border-radius:6px;padding:8px 5px;text-align:center;cursor:pointer;font-size:11px;color:var(--txt2);transition:all .2s;}
+.bm-opt:hover,.bm-opt.active{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,.06);}
+.bm-opt i{display:block;font-size:18px;margin-bottom:3px;}
+
+/* TAB PANES */
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-logo">AJM · WEBGIS</div>
+  <div class="sep"></div>
+  <div class="topbar-mid" id="proj-tabs">
+    <button class="proj-tab active" onclick="switchProject('drought',this)" data-id="Kekeringan OKI" data-en="Drought OKI">🌵 Kekeringan OKI</button>
+    <button class="proj-tab" onclick="switchProject('fire',this)" data-id="dNBR Kebakaran" data-en="Fire Severity">🔥 dNBR Kebakaran</button>
+    <button class="proj-tab" onclick="switchProject('uhi',this)" data-id="UHI & NDVI" data-en="UHI & NDVI">🌡️ UHI & NDVI</button>
+    <button class="proj-tab" onclick="switchProject('sebal',this)" data-id="SEBAL ETa" data-en="SEBAL ETa">💧 SEBAL ETa</button>
+    <button class="proj-tab" onclick="switchProject('flood',this)" data-id="Banjir Palembang" data-en="Flood Palembang">🌊 Banjir Palembang</button>
+    <button class="proj-tab" onclick="switchProject('chirps',this)" data-id="Curah Hujan Gambut" data-en="Rainfall Gambut">🌧️ Curah Hujan Gambut</button>
+    <button class="proj-tab" onclick="switchProject('lst',this)" data-id="MODIS LST" data-en="MODIS LST">🛰️ MODIS LST</button>
+  </div>
+  <div class="topbar-right">
+    <div class="live-ind"><div class="live-dot"></div><span style="font-size:10px;color:var(--txt3)">GEE</span></div>
+    <div class="sep"></div>
+    <button class="lang-btn active" id="lid" onclick="setLang('id')">ID</button>
+    <button class="lang-btn" id="len" onclick="setLang('en')">EN</button>
+    <a href="index.html" class="home-btn">← Beranda</a>
+  </div>
+</div>
+
+<div class="main">
+<!-- ═══ SIDEBAR ═══ -->
+<div class="sidebar">
+  <div class="sidebar-tabs">
+    <div class="s-tab active" onclick="showTab('layers',this)">Layer</div>
+    <div class="s-tab" onclick="showTab('basemap',this)">Basemap</div>
+    <div class="s-tab" onclick="showTab('gee',this)">GEE</div>
+  </div>
+  <div class="scontent" id="scontent">
+
+    <!-- LAYERS TAB -->
+    <div class="tab-pane active" id="tab-layers">
+      <div id="layer-panel"><!-- filled by switchProject() --></div>
+    </div>
+
+    <!-- BASEMAP TAB -->
+    <div class="tab-pane" id="tab-basemap">
+      <div style="font-size:11px;color:var(--txt3);margin-bottom:4px">Pilih tampilan peta dasar:</div>
+      <div class="bm-grid">
+        <div class="bm-opt active" onclick="setBasemap('dark',this)"><i class="ti ti-moon"></i>Dark</div>
+        <div class="bm-opt" onclick="setBasemap('satellite',this)"><i class="ti ti-satellite"></i>Satellite</div>
+        <div class="bm-opt" onclick="setBasemap('topo',this)"><i class="ti ti-mountain"></i>Topo</div>
+        <div class="bm-opt" onclick="setBasemap('street',this)"><i class="ti ti-road"></i>Street</div>
+      </div>
+    </div>
+
+    <!-- GEE TAB -->
+    <div class="tab-pane" id="tab-gee">
+      <div class="gee-guide">
+        <div class="gg-title"><i class="ti ti-brand-google"></i> Generate Tile URL dari GEE</div>
+        <div class="gg-step">1. Buka script GEE kamu → tambahkan kode ini di bagian bawah:</div>
+        <div class="gg-code">var mapId = NAMA_LAYER.getMapId(vizParams);
+print('Tile URL:', mapId.urlFormat);</div>
+        <div class="gg-step" style="margin-top:8px">2. Copy URL dari Console GEE → paste ke input di bawah:</div>
+      </div>
+      <div id="gee-inputs"><!-- filled by project --></div>
+      <div style="margin-top:12px">
+        <div class="lg-title">Dataset Digunakan</div>
+        <div id="gee-datasets"><!-- filled by project --></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- INFO PANEL -->
+  <div class="info-panel">
+    <div class="ip-title" id="ip-title">STATISTIK AREA</div>
+    <div class="ip-grid" id="ip-grid"><!-- filled by project --></div>
+  </div>
+</div>
+
+<!-- ═══ MAP ═══ -->
+<div class="map-area">
+  <div id="wmap"></div>
+  <div class="map-top">
+    <div class="map-badge">
+      <div class="mb-title" id="map-proj-title">KEKERINGAN OKI — 2015–2024</div>
+      <div class="mb-sub" id="map-proj-sub">NDVI · VCI · SPI · Drought Index | MODIS 250m</div>
+    </div>
+    <div class="coords-box">
+      <div class="coords-txt" id="coords">LAT: — &nbsp; LON: —</div>
+    </div>
+  </div>
+  <div class="map-bot">
+    <span class="mb-item">ZOOM <span id="zval">8</span></span>
+    <span class="mb-item">CRS <span>WGS84</span></span>
+    <span class="mb-item">EPSG <span>4326</span></span>
+    <span class="mb-item" id="bot-dataset" style="margin-left:auto;color:var(--a3)">MODIS · Landsat · Sentinel · CHIRPS</span>
+  </div>
+  <div class="map-legend" id="map-legend"><!-- filled by project --></div>
+</div>
+
+<!-- ═══ RIGHT PANEL ═══ -->
+<div class="rpanel">
+  <div class="rp-head">
+    <div class="rp-title" id="rp-title">ANALISIS KEKERINGAN</div>
+    <div class="rp-sub" id="rp-sub">OKI · 2015–2024 · MODIS</div>
+  </div>
+  <div class="rp-body" id="rp-body"><!-- filled by project --></div>
+</div>
+</div><!-- /main -->
+
+<style>
+/* Popup style injection */
+</style>
+
+<script>
+// ══════════════════════════════════════════
+// PROJECT DEFINITIONS
+// ══════════════════════════════════════════
+const projects = {
+
+  drought: {
+    titleID:'KEKERINGAN OKI — 2015–2024', titleEN:'OKI DROUGHT — 2015–2024',
+    subID:'NDVI · VCI · SPI · Drought Index | MODIS 250m', subEN:'NDVI · VCI · SPI · Drought Index | MODIS 250m',
+    center:[-3.5,104.8], zoom:9,
+    botDataset:'MODIS MOD13Q1 · CHIRPS · GEE',
+    rpTitleID:'ANALISIS KEKERINGAN', rpTitleEN:'DROUGHT ANALYSIS',
+    rpSubID:'OKI · 2015–2024 · MODIS', rpSubEN:'OKI · 2015–2024 · MODIS',
+    layers:[
+      {id:'drought_class', label:'Final Drought Classification', labelEN:'Final Drought Class', src:'GEE·MODIS', color:'linear-gradient(90deg,#00aa00,#ffff00,#ff8800,#ff0000)', on:true},
+      {id:'ndvi_mean',     label:'NDVI Mean',       labelEN:'NDVI Mean',      src:'MODIS MOD13Q1', color:'linear-gradient(90deg,#8b4513,#ffff00,#006600)', on:false},
+      {id:'ndvi_anom',     label:'NDVI Anomaly',    labelEN:'NDVI Anomaly',   src:'MODIS',         color:'linear-gradient(90deg,#ff0000,#ffffff,#00aa00)', on:false},
+      {id:'vci',           label:'VCI (Veg. Condition Index)', labelEN:'VCI', src:'MODIS',         color:'linear-gradient(90deg,#ff0000,#ffff00,#00aa00)', on:false},
+      {id:'spi',           label:'SPI (Precip. Index)', labelEN:'SPI',        src:'CHIRPS',        color:'linear-gradient(90deg,#ff0000,#ffffff,#0000ff)', on:false},
+      {id:'sites_drought', label:'Titik Riset',     labelEN:'Research Sites', src:'AJM',           color:'#00d4ff', on:true},
+    ],
+    legend:`<div class="leg-title">DROUGHT CLASS</div>
+      <div class="leg-item"><div class="leg-sw" style="background:#00aa00"></div><div class="leg-lbl">Tidak Kering (1)</div></div>
+      <div class="leg-item"><div class="leg-sw" style="background:#ffff00"></div><div class="leg-lbl">Ringan (2)</div></div>
+      <div class="leg-item"><div class="leg-sw" style="background:#ff8800"></div><div class="leg-lbl">Sedang (3)</div></div>
+      <div class="leg-item"><div class="leg-sw" style="background:#ff0000"></div><div class="leg-lbl">Berat (4)</div></div>`,
+    stats:[
+      {val:'0.58', label:'NDVI Mean', color:'var(--a3)'},
+      {val:'62%',  label:'VCI Mean',  color:'var(--accent)'},
+      {val:'-0.8', label:'SPI Mean',  color:'var(--warn)'},
+      {val:'2.3',  label:'Drought Idx', color:'var(--danger)'},
+    ],
+    geeInputs:[
+      {id:'url_drought_class', label:'Drought Classification URL'},
+      {id:'url_ndvi_mean',     label:'NDVI Mean URL'},
+      {id:'url_vci',           label:'VCI URL'},
+      {id:'url_spi',           label:'SPI URL'},
+    ],
+    datasets:['MODIS/006/MOD13Q1 (NDVI)','UCSB-CHG/CHIRPS/DAILY','GEE Drought Index'],
+    rpHTML: () => `
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Time Series NDVI (OKI)</span><span class="cc-badge">MODIS</span></div>
+        <div class="chart-wrap"><canvas id="ch1"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">VCI Over Time</span><span class="cc-badge">%</span></div>
+        <div class="chart-wrap"><canvas id="ch2"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Distribusi Kelas Kekeringan</span><span class="cc-badge">OKI</span></div>
+        <div style="padding:6px 0">
+          <div class="sev-row"><span class="sev-lbl">Tidak Kering</span><div class="sev-bg"><div class="sev-fill" style="width:28%;background:#00aa00"></div></div><span class="sev-val">28%</span></div>
+          <div class="sev-row"><span class="sev-lbl">Ringan</span><div class="sev-bg"><div class="sev-fill" style="width:34%;background:#ffff00"></div></div><span class="sev-val">34%</span></div>
+          <div class="sev-row"><span class="sev-lbl">Sedang</span><div class="sev-bg"><div class="sev-fill" style="width:24%;background:#ff8800"></div></div><span class="sev-val">24%</span></div>
+          <div class="sev-row"><span class="sev-lbl">Berat</span><div class="sev-bg"><div class="sev-fill" style="width:14%;background:#ff0000"></div></div><span class="sev-val">14%</span></div>
+        </div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Curah Hujan Bulanan</span><span class="cc-badge">CHIRPS</span></div>
+        <div class="chart-wrap"><canvas id="ch3"></canvas></div>
+      </div>`,
+    renderCharts: () => {
+      const years = ['2015','2016','2017','2018','2019','2020','2021','2022','2023','2024'];
+      mkLine('ch1', years, [0.61,0.58,0.52,0.49,0.55,0.44,0.57,0.51,0.59,0.56], '#00ff88','NDVI');
+      mkLine('ch2', years, [68,62,54,48,60,40,58,50,63,59], '#00d4ff','VCI %');
+      mkBar('ch3',  ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'],
+            [312,285,340,280,260,180,120,95,110,240,310,295], '#0066ff');
+    }
+  },
+
+  fire: {
+    titleID:'dNBR KEBAKARAN — OKI 2018→2020', titleEN:'dNBR FIRE SEVERITY — OKI 2018→2020',
+    subID:'NBR Pre/Post Fire · Burn Severity | Landsat 8 30m', subEN:'NBR Pre/Post Fire · Burn Severity | Landsat 8 30m',
+    center:[-3.5,104.8], zoom:9,
+    botDataset:'Landsat 8 C02 L2 · USGS · GEE',
+    rpTitleID:'ANALISIS KEBAKARAN', rpTitleEN:'FIRE ANALYSIS',
+    rpSubID:'OKI · Pre 2018 vs Post 2020', rpSubEN:'OKI · Pre 2018 vs Post 2020',
+    layers:[
+      {id:'burn_sev',   label:'Burn Severity (dNBR Class)', labelEN:'Burn Severity', src:'Landsat 8', color:'linear-gradient(90deg,#00aa00,#ffff00,#ff8800,#ff0000)', on:true},
+      {id:'dnbr',       label:'dNBR (Continuous)',    labelEN:'dNBR',          src:'Landsat 8', color:'linear-gradient(90deg,#00aa00,#ffff00,#ff0000)', on:false},
+      {id:'nbr_pre',    label:'NBR Pre-Fire (2018)',   labelEN:'NBR Pre 2018',  src:'Landsat 8', color:'linear-gradient(90deg,#8b4513,#ffff00,#00aa00)', on:false},
+      {id:'nbr_post',   label:'NBR Post-Fire (2020)',  labelEN:'NBR Post 2020', src:'Landsat 8', color:'linear-gradient(90deg,#8b4513,#ffff00,#00aa00)', on:false},
+      {id:'sites_fire', label:'Titik Riset',           labelEN:'Research Sites',src:'AJM',       color:'#ef4444', on:true},
+    ],
+    legend:`<div class="leg-title">BURN SEVERITY</div>
+      <div class="leg-item"><div class="leg-sw" style="background:#00aa00"></div><div class="leg-lbl">Tidak Terbakar (&lt;0.1)</div></div>
+      <div class="leg-item"><div class="leg-sw" style="background:#ffff00"></div><div class="leg-lbl">Rendah (0.1–0.27)</div></div>
+      <div class="leg-item"><div class="leg-sw" style="background:#ff8800"></div><div class="leg-lbl">Sedang (0.27–0.44)</div></div>
+      <div class="leg-item"><div class="leg-sw" style="background:#ff0000"></div><div class="leg-lbl">Tinggi (&gt;0.44)</div></div>`,
+    stats:[
+      {val:'0.38', label:'dNBR Mean',  color:'var(--warn)'},
+      {val:'32%',  label:'Area Terbakar', color:'var(--danger)'},
+      {val:'2018', label:'Pre-Fire',   color:'var(--a3)'},
+      {val:'2020', label:'Post-Fire',  color:'var(--accent)'},
+    ],
+    geeInputs:[
+      {id:'url_burn_sev', label:'Burn Severity URL'},
+      {id:'url_dnbr',     label:'dNBR URL'},
+      {id:'url_nbr_pre',  label:'NBR Pre-Fire URL'},
+      {id:'url_nbr_post', label:'NBR Post-Fire URL'},
+    ],
+    datasets:['LANDSAT/LC08/C02/T1_L2','dNBR = NBR_pre − NBR_post'],
+    rpHTML: () => `
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">dNBR Distribution</span><span class="cc-badge">Landsat 8</span></div>
+        <div class="chart-wrap"><canvas id="ch1"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">NBR: Pre vs Post Fire</span><span class="cc-badge">2018→2020</span></div>
+        <div class="chart-wrap"><canvas id="ch2"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Area Terbakar per Kelas</span><span class="cc-badge">km²</span></div>
+        <div style="padding:6px 0">
+          <div class="sev-row"><span class="sev-lbl">Tidak Terbakar</span><div class="sev-bg"><div class="sev-fill" style="width:68%;background:#00aa00"></div></div><span class="sev-val">68%</span></div>
+          <div class="sev-row"><span class="sev-lbl">Ringan</span><div class="sev-bg"><div class="sev-fill" style="width:15%;background:#ffff00"></div></div><span class="sev-val">15%</span></div>
+          <div class="sev-row"><span class="sev-lbl">Sedang</span><div class="sev-bg"><div class="sev-fill" style="width:10%;background:#ff8800"></div></div><span class="sev-val">10%</span></div>
+          <div class="sev-row"><span class="sev-lbl">Tinggi</span><div class="sev-bg"><div class="sev-fill" style="width:7%;background:#ff0000"></div></div><span class="sev-val">7%</span></div>
+        </div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Hotspot Count per Tahun</span><span class="cc-badge">MODIS</span></div>
+        <div class="chart-wrap"><canvas id="ch3"></canvas></div>
+      </div>`,
+    renderCharts: () => {
+      mkBar('ch1', ['-0.5→-0.1','−0.1→0.1','0.1→0.27','0.27→0.44','>0.44'],
+            [8,60,15,10,7], ['#0066ff','#00aa00','#ffff00','#ff8800','#ff0000']);
+      mkLine('ch2', ['Pre-NBR 2018','Post-NBR 2020'],[0.62,0.24],'#ef4444','NBR');
+      mkBar('ch3', ['2015','2016','2017','2018','2019','2020','2021','2022','2023','2024'],
+            [42,65,38,112,88,145,72,58,90,48], '#ef4444');
+    }
+  },
+
+  uhi: {
+    titleID:'UHI & NDVI — OKI 2013', titleEN:'UHI & NDVI — OKI 2013',
+    subID:'NDVI · LST · Urban Heat Island | Landsat 8 30m', subEN:'NDVI · LST · Urban Heat Island | Landsat 8 30m',
+    center:[-3.5,104.8], zoom:9,
+    botDataset:'Landsat 8 C02 T1 · 2013 · Level 1',
+    rpTitleID:'ANALISIS UHI & LST', rpTitleEN:'UHI & LST ANALYSIS',
+    rpSubID:'OKI · Landsat 8 · 2013', rpSubEN:'OKI · Landsat 8 · 2013',
+    layers:[
+      {id:'uhi',      label:'Urban Heat Island (UHI)', labelEN:'Urban Heat Island', src:'Landsat 8', color:'linear-gradient(90deg,#0000ff,#ffffff,#ff0000)', on:true},
+      {id:'lst_l8',   label:'LST (°C)',                labelEN:'LST (°C)',          src:'Landsat 8', color:'linear-gradient(90deg,#0000ff,#00ffff,#00ff00,#ffff00,#ff8800,#ff0000)', on:false},
+      {id:'ndvi_uhi', label:'NDVI',                    labelEN:'NDVI',              src:'Landsat 8', color:'linear-gradient(90deg,#0000ff,#ffffff,#00aa00)', on:false},
+      {id:'sites_uhi',label:'Titik Riset',             labelEN:'Research Sites',    src:'AJM',       color:'#f59e0b', on:true},
+    ],
+    legend:`<div class="leg-title">URBAN HEAT ISLAND</div>
+      <div class="leg-bar" style="background:linear-gradient(90deg,#0000ff,#ffffff,#ff0000)"></div>
+      <div class="leg-labs"><span>-5°C</span><span>0°C</span><span>+5°C</span></div>
+      <div style="margin-top:8px">
+        <div class="leg-title">LST</div>
+        <div class="leg-bar" style="background:linear-gradient(90deg,#0000ff,#00ffff,#00ff00,#ffff00,#ff0000)"></div>
+        <div class="leg-labs"><span>20°C</span><span>30°C</span><span>40°C</span></div>
+      </div>`,
+    stats:[
+      {val:'32.4°C', label:'LST Mean',  color:'var(--warn)'},
+      {val:'2.8°C',  label:'UHI Max',   color:'var(--danger)'},
+      {val:'0.54',   label:'NDVI Mean', color:'var(--a3)'},
+      {val:'Neg.',   label:'NDVI-LST',  color:'var(--accent)'},
+    ],
+    geeInputs:[
+      {id:'url_uhi',    label:'UHI Layer URL'},
+      {id:'url_lst_l8', label:'LST Layer URL'},
+      {id:'url_ndvi_l8',label:'NDVI Layer URL'},
+    ],
+    datasets:['LANDSAT/LC08/C02/T1','LST via B10 thermal','NDVI = (B5−B4)/(B5+B4)'],
+    rpHTML: () => `
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Histogram NDVI</span><span class="cc-badge">Landsat 8</span></div>
+        <div class="chart-wrap"><canvas id="ch1"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Histogram UHI (°C)</span><span class="cc-badge">UHI</span></div>
+        <div class="chart-wrap"><canvas id="ch2"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Scatter NDVI vs LST</span><span class="cc-badge">Korelasi Negatif</span></div>
+        <div class="chart-wrap"><canvas id="ch3"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Statistik</span></div>
+        <table class="atbl">
+          <tr><td>NDVI Min</td><td style="color:var(--danger)">-0.12</td></tr>
+          <tr><td>NDVI Max</td><td style="color:var(--a3)">0.81</td></tr>
+          <tr><td>NDVI Mean</td><td style="color:var(--accent)">0.54</td></tr>
+          <tr><td>LST Min</td><td style="color:var(--a3)">24.3°C</td></tr>
+          <tr><td>LST Max</td><td style="color:var(--danger)">39.8°C</td></tr>
+          <tr><td>UHI Mean</td><td style="color:var(--warn)">+1.4°C</td></tr>
+        </table>
+      </div>`,
+    renderCharts: () => {
+      const ndviBins = ['-0.2','-0.1','0.0','0.1','0.2','0.3','0.4','0.5','0.6','0.7','0.8'];
+      mkBar('ch1', ndviBins, [50,80,120,200,350,480,420,280,150,60,20], '#00aa00');
+      const uhiBins = ['-5','-4','-3','-2','-1','0','+1','+2','+3','+4','+5'];
+      mkBar('ch2', uhiBins, [10,20,50,120,250,400,300,180,80,30,10], '#ef4444');
+      // Scatter approx
+      const sc = document.getElementById('ch3');
+      if(sc) new Chart(sc,{type:'scatter',data:{datasets:[{data:Array.from({length:80},(_,i)=>({x:Math.random()*.9-.1,y:40-Math.random()*15-((Math.random()*.9-.1)*10)})),backgroundColor:'rgba(0,212,255,.4)',pointRadius:3}]},options:{...chartOpts(),plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:'NDVI',color:'rgba(200,225,240,.4)'},grid:{color:'rgba(0,212,255,.05)'},ticks:{color:'rgba(200,225,240,.35)',font:{size:9}}},y:{title:{display:true,text:'LST °C',color:'rgba(200,225,240,.4)'},grid:{color:'rgba(0,212,255,.05)'},ticks:{color:'rgba(200,225,240,.35)',font:{size:9}}}}}});
+    }
+  },
+
+  sebal: {
+    titleID:'SEBAL EVAPOTRANSPIRASI — Lokasi Perigi 2024', titleEN:'SEBAL ETa — Lokasi Perigi 2024',
+    subID:'ETa · LE · Rn · G · H | Landsat 8 30m · ERA5', subEN:'ETa · LE · Rn · G · H | Landsat 8 30m · ERA5',
+    center:[-3.6,104.5], zoom:10,
+    botDataset:'Landsat 8 C02 L2 · ERA5-Land · GEE · 2024',
+    rpTitleID:'ANALISIS SEBAL ETa', rpTitleEN:'SEBAL ETa ANALYSIS',
+    rpSubID:'Lokasi Perigi · 2024 · Landsat 8', rpSubEN:'Lokasi Perigi · 2024 · Landsat 8',
+    layers:[
+      {id:'eta',      label:'ETa (mm/hari)',  labelEN:'ETa (mm/day)',  src:'SEBAL·Landsat', color:'linear-gradient(90deg,#0000ff,#00ffff,#00ff00,#ffff00,#ff0000)', on:true},
+      {id:'le',       label:'LE (W/m²)',      labelEN:'LE (W/m²)',     src:'SEBAL',         color:'linear-gradient(90deg,#0000ff,#00ff00,#ff8800)', on:false},
+      {id:'rn',       label:'Rn Net Radiation',labelEN:'Rn (W/m²)',    src:'SEBAL',         color:'linear-gradient(90deg,#ffff00,#ff8800,#ff0000)', on:false},
+      {id:'ndvi_sbl', label:'NDVI',           labelEN:'NDVI',          src:'Landsat 8',     color:'linear-gradient(90deg,#ffffff,#00aa00)', on:false},
+      {id:'sites_sbl',label:'Titik Riset',    labelEN:'Research Sites',src:'AJM',           color:'#00ff88', on:true},
+    ],
+    legend:`<div class="leg-title">ETa (mm/HARI)</div>
+      <div class="leg-bar" style="background:linear-gradient(90deg,#0000ff,#00ffff,#00ff00,#ffff00,#ff0000)"></div>
+      <div class="leg-labs"><span>0</span><span>4</span><span>8</span></div>`,
+    stats:[
+      {val:'3.8',  label:'ETa Mean mm/d', color:'var(--accent)'},
+      {val:'0.72', label:'NDVI Mean',     color:'var(--a3)'},
+      {val:'425',  label:'Rn W/m²',       color:'var(--warn)'},
+      {val:'2024', label:'Tahun',         color:'var(--txt2)'},
+    ],
+    geeInputs:[
+      {id:'url_eta',  label:'ETa Layer URL'},
+      {id:'url_le',   label:'LE Layer URL'},
+      {id:'url_rn',   label:'Rn Layer URL'},
+      {id:'url_ndvi_sebal', label:'NDVI Layer URL'},
+    ],
+    datasets:['LANDSAT/LC08/C02/T1_L2','ECMWF/ERA5_LAND/DAILY_AGGR','SEBAL Algorithm'],
+    rpHTML: () => `
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Histogram ETa (mm/hari)</span><span class="cc-badge">SEBAL</span></div>
+        <div class="chart-wrap"><canvas id="ch1"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Scatter NDVI vs ETa</span><span class="cc-badge">Korelasi Positif</span></div>
+        <div class="chart-wrap"><canvas id="ch2"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Komponen Energi</span><span class="cc-badge">W/m²</span></div>
+        <div style="padding:6px 0">
+          <div class="sev-row"><span class="sev-lbl">Rn</span><div class="sev-bg"><div class="sev-fill" style="width:100%;background:#f59e0b"></div></div><span class="sev-val">425</span></div>
+          <div class="sev-row"><span class="sev-lbl">LE</span><div class="sev-bg"><div class="sev-fill" style="width:60%;background:#00aaff"></div></div><span class="sev-val">255</span></div>
+          <div class="sev-row"><span class="sev-lbl">H</span><div class="sev-bg"><div class="sev-fill" style="width:26%;background:#ef4444"></div></div><span class="sev-val">110</span></div>
+          <div class="sev-row"><span class="sev-lbl">G</span><div class="sev-bg"><div class="sev-fill" style="width:14%;background:#888"></div></div><span class="sev-val">60</span></div>
+        </div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Statistik ETa</span></div>
+        <table class="atbl">
+          <tr><td>Mean</td><td style="color:var(--accent)">3.8 mm/d</td></tr>
+          <tr><td>Std Dev</td><td style="color:var(--txt2)">1.2 mm/d</td></tr>
+          <tr><td>Min</td><td style="color:var(--a3)">0.4 mm/d</td></tr>
+          <tr><td>Max</td><td style="color:var(--danger)">7.9 mm/d</td></tr>
+          <tr><td>Metode</td><td style="color:var(--warn)">SEBAL</td></tr>
+        </table>
+      </div>`,
+    renderCharts: () => {
+      mkBar('ch1',['0–1','1–2','2–3','3–4','4–5','5–6','6–7','7–8'],[30,80,150,220,250,180,80,20],'#00aaff');
+      const sc2 = document.getElementById('ch2');
+      if(sc2) new Chart(sc2,{type:'scatter',data:{datasets:[{data:Array.from({length:80},()=>({x:Math.random(),y:Math.random()*7+0.5+Math.random()*3})),backgroundColor:'rgba(0,255,136,.4)',pointRadius:3}]},options:{...chartOpts(),plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:'NDVI',color:'rgba(200,225,240,.4)'},grid:{color:'rgba(0,212,255,.05)'},ticks:{color:'rgba(200,225,240,.35)',font:{size:9}}},y:{title:{display:true,text:'ETa mm/d',color:'rgba(200,225,240,.4)'},grid:{color:'rgba(0,212,255,.05)'},ticks:{color:'rgba(200,225,240,.35)',font:{size:9}}}}}});
+    }
+  },
+
+  flood: {
+    titleID:'ANALISIS BANJIR — PALEMBANG 2024', titleEN:'FLOOD ANALYSIS — PALEMBANG 2024',
+    subID:'DEM · Slope · Flood Extent · Flood Risk | Sentinel-1 & Sentinel-2', subEN:'DEM · Slope · Flood Extent · Flood Risk | Sentinel-1 & S2',
+    center:[-2.98,104.75], zoom:10,
+    botDataset:'Sentinel-1 GRD · Sentinel-2 SR · SRTM · CHIRPS',
+    rpTitleID:'ANALISIS BANJIR', rpTitleEN:'FLOOD ANALYSIS',
+    rpSubID:'Palembang · 2024 · Sentinel', rpSubEN:'Palembang · 2024 · Sentinel',
+    layers:[
+      {id:'flood_risk',   label:'Flood Susceptibility',  labelEN:'Flood Susceptibility', src:'GEE·S1/S2', color:'linear-gradient(90deg,#00aa00,#ffff00,#ff8800,#ff0000)', on:true},
+      {id:'flood_extent', label:'Flood Extent (SAR)',     labelEN:'Flood Extent (SAR)',   src:'Sentinel-1', color:'#00aaff', on:false},
+      {id:'dem',          label:'DEM / Elevasi (SRTM)',   labelEN:'DEM / Elevation',      src:'USGS SRTM',  color:'linear-gradient(90deg,#0000ff,#00ffff,#00aa00,#ffff00,#ff0000)', on:false},
+      {id:'ndvi_flood',   label:'NDVI (Sentinel-2)',      labelEN:'NDVI (S2)',             src:'Sentinel-2', color:'linear-gradient(90deg,#8b4513,#ffff00,#006600)', on:false},
+      {id:'rainfall_plg', label:'Curah Hujan (CHIRPS)',   labelEN:'Rainfall (CHIRPS)',     src:'CHIRPS',     color:'linear-gradient(90deg,#ffffff,#00aaff,#000088)', on:false},
+      {id:'rivers',       label:'Jaringan Sungai',        labelEN:'River Network',         src:'HydroSHEDS', color:'#00aaff', on:true},
+      {id:'sites_flood',  label:'Titik Riset',            labelEN:'Research Sites',        src:'AJM',        color:'#00d4ff', on:true},
+    ],
+    legend:`<div class="leg-title">FLOOD SUSCEPTIBILITY</div>
+      <div class="leg-item"><div class="leg-sw" style="background:#00aa00"></div><div class="leg-lbl">Rendah</div></div>
+      <div class="leg-item"><div class="leg-sw" style="background:#ffff00"></div><div class="leg-lbl">Sedang</div></div>
+      <div class="leg-item"><div class="leg-sw" style="background:#ff8800"></div><div class="leg-lbl">Tinggi</div></div>
+      <div class="leg-item"><div class="leg-sw" style="background:#ff0000"></div><div class="leg-lbl">Sangat Tinggi</div></div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        <div class="leg-item"><div class="leg-sw" style="background:#00aaff;opacity:.6"></div><div class="leg-lbl">Flood Extent (SAR)</div></div>
+      </div>`,
+    stats:[
+      {val:'18%',  label:'Area Banjir',  color:'var(--danger)'},
+      {val:'42m',  label:'Elevasi Rata', color:'var(--accent)'},
+      {val:'2.8°', label:'Slope Mean',   color:'var(--warn)'},
+      {val:'2024', label:'Tahun',        color:'var(--txt2)'},
+    ],
+    geeInputs:[
+      {id:'url_flood_risk',   label:'Flood Susceptibility URL'},
+      {id:'url_flood_extent', label:'Flood Extent (SAR) URL'},
+      {id:'url_dem',          label:'DEM URL'},
+      {id:'url_ndvi_flood',   label:'NDVI URL'},
+    ],
+    datasets:['COPERNICUS/S1_GRD','COPERNICUS/S2_SR_HARMONIZED','USGS/SRTMGL1_003','WWF/HydroSHEDS/15ACC'],
+    rpHTML: () => `
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Curah Hujan Harian 2024</span><span class="cc-badge">CHIRPS</span></div>
+        <div class="chart-wrap"><canvas id="ch1"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Distribusi Flood Risk</span><span class="cc-badge">Palembang</span></div>
+        <div style="padding:6px 0">
+          <div class="sev-row"><span class="sev-lbl">Rendah</span><div class="sev-bg"><div class="sev-fill" style="width:35%;background:#00aa00"></div></div><span class="sev-val">35%</span></div>
+          <div class="sev-row"><span class="sev-lbl">Sedang</span><div class="sev-bg"><div class="sev-fill" style="width:29%;background:#ffff00"></div></div><span class="sev-val">29%</span></div>
+          <div class="sev-row"><span class="sev-lbl">Tinggi</span><div class="sev-bg"><div class="sev-fill" style="width:22%;background:#ff8800"></div></div><span class="sev-val">22%</span></div>
+          <div class="sev-row"><span class="sev-lbl">Sangat Tinggi</span><div class="sev-bg"><div class="sev-fill" style="width:14%;background:#ff0000"></div></div><span class="sev-val">14%</span></div>
+        </div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">SAR: Before vs After</span><span class="cc-badge">Sentinel-1</span></div>
+        <div class="chart-wrap"><canvas id="ch2"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Parameter Analisis</span></div>
+        <table class="atbl">
+          <tr><td>SAR Band</td><td style="color:var(--accent)">VV Polarization</td></tr>
+          <tr><td>Threshold</td><td style="color:var(--warn)">-1.5 dB</td></tr>
+          <tr><td>DEM Sumber</td><td style="color:var(--txt2)">SRTM 30m</td></tr>
+          <tr><td>NDVI Sensor</td><td style="color:var(--a3)">Sentinel-2</td></tr>
+          <tr><td>Cloud Cover</td><td style="color:var(--a3)">&lt;20%</td></tr>
+        </table>
+      </div>`,
+    renderCharts: () => {
+      mkBar('ch1',['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'],
+            [280,340,310,220,180,120,90,85,140,260,300,320],'#0066ff');
+      mkLine('ch2',['Before (Jan)','After (Feb)'],['-8.2','-12.4'],'#00aaff','VV dB');
+    }
+  },
+
+  chirps: {
+    titleID:'CURAH HUJAN CHIRPS — GAMBUT DEGREE', titleEN:'CHIRPS RAINFALL — GAMBUT DEGREE',
+    subID:'Daily Precipitation | CHIRPS 5km · 2015–2026', subEN:'Daily Precipitation | CHIRPS 5km · 2015–2026',
+    center:[-3.4,104.5], zoom:9,
+    botDataset:'UCSB-CHG/CHIRPS/DAILY · 2015–2026',
+    rpTitleID:'ANALISIS CURAH HUJAN', rpTitleEN:'RAINFALL ANALYSIS',
+    rpSubID:'Gambut Degree · CHIRPS · 2015–2026', rpSubEN:'Gambut Degree · CHIRPS · 2015–2026',
+    layers:[
+      {id:'precip_mean', label:'Curah Hujan Rata-rata', labelEN:'Mean Precipitation', src:'CHIRPS',   color:'linear-gradient(90deg,#ffffff,#00aaff,#0000aa)', on:true},
+      {id:'precip_anom', label:'Anomali Curah Hujan',   labelEN:'Rainfall Anomaly',   src:'CHIRPS',   color:'linear-gradient(90deg,#ff0000,#ffffff,#0000ff)', on:false},
+      {id:'peat_area',   label:'Area Gambut',           labelEN:'Peatland Area',      src:'AJM Asset',color:'#00ff88', on:true},
+      {id:'sites_chirps',label:'Titik Riset',           labelEN:'Research Sites',     src:'AJM',      color:'#00d4ff', on:true},
+    ],
+    legend:`<div class="leg-title">CURAH HUJAN (mm)</div>
+      <div class="leg-bar" style="background:linear-gradient(90deg,#ffffff,#00aaff,#000088)"></div>
+      <div class="leg-labs"><span>0</span><span>10</span><span>20mm</span></div>`,
+    stats:[
+      {val:'8.2mm', label:'Rata-rata Harian', color:'var(--accent)'},
+      {val:'2890',  label:'Total Tahunan mm', color:'var(--a3)'},
+      {val:'2015',  label:'Mulai',            color:'var(--txt2)'},
+      {val:'2026',  label:'Akhir',            color:'var(--txt2)'},
+    ],
+    geeInputs:[
+      {id:'url_precip_mean', label:'Precipitation Mean URL'},
+      {id:'url_precip_anom', label:'Precipitation Anomaly URL'},
+    ],
+    datasets:['UCSB-CHG/CHIRPS/DAILY','projects/wijaya-474816/assets/Gambut_Degree'],
+    rpHTML: () => `
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Daily Precipitation Over Time</span><span class="cc-badge">CHIRPS</span></div>
+        <div class="chart-wrap"><canvas id="ch1"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Curah Hujan Bulanan 2024</span><span class="cc-badge">mm/bulan</span></div>
+        <div class="chart-wrap"><canvas id="ch2"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Tren Tahunan</span><span class="cc-badge">mm/thn</span></div>
+        <div class="chart-wrap"><canvas id="ch3"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Statistik Curah Hujan</span></div>
+        <table class="atbl">
+          <tr><td>Mean Harian</td><td style="color:var(--accent)">8.2 mm</td></tr>
+          <tr><td>Max Harian</td><td style="color:var(--danger)">78.4 mm</td></tr>
+          <tr><td>Total 2024</td><td style="color:var(--a3)">2,890 mm</td></tr>
+          <tr><td>Bulan Kering</td><td style="color:var(--warn)">Jun–Agt</td></tr>
+          <tr><td>Resolusi</td><td style="color:var(--txt2)">5km / hari</td></tr>
+        </table>
+      </div>`,
+    renderCharts: () => {
+      const months12 = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
+      mkLine('ch1',['2019','2020','2021','2022','2023','2024'],[7.8,6.2,8.1,7.4,8.8,8.2],'#00aaff','mm/hari');
+      mkBar('ch2', months12, [320,295,340,270,230,150,100,88,130,260,305,330],'#0066ff');
+      mkBar('ch3', ['2015','2016','2017','2018','2019','2020','2021','2022','2023','2024'],
+            [2850,2620,2400,2710,2890,2350,2780,2580,2960,2890],'#00aaff');
+    }
+  },
+
+  lst: {
+    titleID:'MODIS LST — OKI 2015–2025', titleEN:'MODIS LST — OKI 2015–2025',
+    subID:'Land Surface Temperature Bulanan | MODIS MOD11A2 1km', subEN:'Monthly Land Surface Temperature | MODIS MOD11A2 1km',
+    center:[-3.5,104.8], zoom:9,
+    botDataset:'MODIS/061/MOD11A2 · 1km · 8-day · 2015–2025',
+    rpTitleID:'ANALISIS MODIS LST', rpTitleEN:'MODIS LST ANALYSIS',
+    rpSubID:'OKI · 2015–2025 · 1km · Bulanan', rpSubEN:'OKI · 2015–2025 · 1km · Monthly',
+    layers:[
+      {id:'lst_modis',  label:'LST Mean (°C)',      labelEN:'LST Mean (°C)',     src:'MODIS MOD11A2', color:'linear-gradient(90deg,#00aa00,#ffff00,#ff8800,#ff0000)', on:true},
+      {id:'lst_jan',    label:'LST Januari',        labelEN:'LST January',       src:'MODIS',         color:'linear-gradient(90deg,#00aa00,#ffff00,#ff0000)', on:false},
+      {id:'lst_aug',    label:'LST Agustus (Kering)',labelEN:'LST August (Dry)', src:'MODIS',         color:'linear-gradient(90deg,#ffff00,#ff8800,#ff0000)', on:false},
+      {id:'sites_lst',  label:'Titik Riset',        labelEN:'Research Sites',    src:'AJM',           color:'#00d4ff', on:true},
+    ],
+    legend:`<div class="leg-title">LST (°C)</div>
+      <div class="leg-bar" style="background:linear-gradient(90deg,#00aa00,#ffff00,#ff8800,#ff0000)"></div>
+      <div class="leg-labs"><span>20°C</span><span>30°C</span><span>40°C</span></div>`,
+    stats:[
+      {val:'31.2°C', label:'LST Mean',    color:'var(--warn)'},
+      {val:'38.5°C', label:'LST Max',     color:'var(--danger)'},
+      {val:'22.1°C', label:'LST Min',     color:'var(--a3)'},
+      {val:'1km',    label:'Resolusi',    color:'var(--txt2)'},
+    ],
+    geeInputs:[
+      {id:'url_lst_modis', label:'LST Mean URL'},
+      {id:'url_lst_jan',   label:'LST Januari URL'},
+      {id:'url_lst_aug',   label:'LST Agustus URL'},
+    ],
+    datasets:['MODIS/061/MOD11A2 (LST_Day_1km)','Scale: × 0.02 − 273.15 → °C'],
+    rpHTML: () => `
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Avg LST per Bulan (2015–2025)</span><span class="cc-badge">MODIS</span></div>
+        <div class="chart-wrap"><canvas id="ch1"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Tren LST Tahunan</span><span class="cc-badge">°C/thn</span></div>
+        <div class="chart-wrap"><canvas id="ch2"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">LST Jan vs Agt (Basah vs Kering)</span><span class="cc-badge">Perbandingan</span></div>
+        <div class="chart-wrap"><canvas id="ch3"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="cc-head"><span class="cc-ttl">Statistik LST Bulanan</span></div>
+        <table class="atbl">
+          <tr><td>Mean</td><td style="color:var(--warn)">31.2°C</td></tr>
+          <tr><td>Max (Agt)</td><td style="color:var(--danger)">38.5°C</td></tr>
+          <tr><td>Min (Jan)</td><td style="color:var(--a3)">26.3°C</td></tr>
+          <tr><td>Dataset</td><td style="color:var(--txt2)">MOD11A2.061</td></tr>
+          <tr><td>Periode</td><td style="color:var(--txt2)">2015–2025</td></tr>
+        </table>
+      </div>`,
+    renderCharts: () => {
+      const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
+      mkLine('ch1', months, [26.3,27.1,28.4,30.2,31.8,33.5,35.2,38.5,36.1,31.4,28.8,26.9], '#f59e0b','LST °C');
+      mkLine('ch2', ['2015','2016','2017','2018','2019','2020','2021','2022','2023','2024','2025'],
+             [30.1,30.8,31.2,31.9,30.6,32.4,31.0,31.8,31.5,32.1,32.8], '#ef4444','LST °C');
+      const ch3 = document.getElementById('ch3');
+      if(ch3) new Chart(ch3,{type:'bar',data:{labels:months,datasets:[
+        {label:'Jan',data:[26,27,28,28,29,28,27,28,27,28,27,26],backgroundColor:'rgba(0,170,255,.5)',borderColor:'#00aaff',borderWidth:1,borderRadius:2},
+        {label:'Agt',data:[32,33,34,35,36,37,38,39,38,36,34,32],backgroundColor:'rgba(239,68,68,.5)',borderColor:'#ef4444',borderWidth:1,borderRadius:2}
+      ]},options:{...chartOpts()}});
+    }
+  }
+};
+
+// ══════════════════════════════════════════
+// LEAFLET MAP
+// ══════════════════════════════════════════
+const wmap = L.map('wmap',{center:[-3.5,104.8],zoom:9,zoomControl:true,attributionControl:false});
+const basemaps = {
+  dark:      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'),
+  satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'),
+  topo:      L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'),
+  street:    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'),
+};
+let curBase = basemaps.dark.addTo(wmap);
+function setBasemap(name,el){wmap.removeLayer(curBase);curBase=basemaps[name].addTo(wmap);document.querySelectorAll('.bm-opt').forEach(b=>b.classList.remove('active'));el.classList.add('active');}
+
+wmap.on('mousemove',e=>{document.getElementById('coords').textContent=`LAT: ${e.latlng.lat.toFixed(5)}  LON: ${e.latlng.lng.toFixed(5)}`;});
+wmap.on('zoomend',()=>{document.getElementById('zval').textContent=wmap.getZoom();});
+
+// Research site markers per project
+const siteData = {
+  drought: [{lat:-3.45,lng:104.90,label:'OKI — Drought & NDVI Analysis',color:'#00d4ff',desc:'NDVI+CHIRPS+VCI 2015–2024, Drought Index'},{lat:-3.20,lng:105.50,label:'OKI — Vegetation Change',color:'#00d4ff',desc:'Multitemporal NDVI detection MODIS'}],
+  fire:    [{lat:-3.60,lng:105.20,label:'OKI — KARHUTLA Hazard Zone',color:'#ef4444',desc:'dNBR fire severity 2018→2020, Landsat 8'},{lat:-3.45,lng:104.80,label:'OKI — Burn Severity Area',color:'#ff8800',desc:'High severity burn class 2020'}],
+  uhi:     [{lat:-3.50,lng:104.85,label:'OKI — UHI Analysis',color:'#f59e0b',desc:'NDVI+LST+UHI, Landsat 8, 2013'}],
+  sebal:   [{lat:-3.60,lng:104.50,label:'Lokasi Perigi — SEBAL ETa',color:'#00ff88',desc:'Evapotranspirasi harian via SEBAL 2024'}],
+  flood:   [{lat:-2.98,lng:104.75,label:'Palembang — Flood Analysis',color:'#00aaff',desc:'SAR Sentinel-1, Flood Risk, DEM 2024'},{lat:-3.10,lng:104.60,label:'Palembang — River Network',color:'#0066ff',desc:'HydroSHEDS flow accumulation'}],
+  chirps:  [{lat:-3.40,lng:104.50,label:'Gambut Degree — CHIRPS Rainfall',color:'#00d4ff',desc:'Daily precipitation 2015–2026'},{lat:-3.55,lng:103.80,label:'South Sumatra — Rainfall Trend',color:'#0066ff',desc:'CHIRPS annual trend analysis'}],
+  lst:     [{lat:-3.45,lng:104.90,label:'OKI — MODIS LST',color:'#f59e0b',desc:'Monthly LST MOD11A2 2015–2025'},{lat:-3.30,lng:104.50,label:'OKI — LST Seasonal',color:'#ef4444',desc:'Wet vs dry season comparison'}],
+};
+
+// GEE tile layers (populated via URL inputs)
+const geeTileLayers = {};
+let activeSiteLayer = null;
+
+function buildSiteLayer(projKey){
+  if(activeSiteLayer) wmap.removeLayer(activeSiteLayer);
+  const lg = L.layerGroup();
+  (siteData[projKey]||[]).forEach(s=>{
+    const icon = L.divIcon({className:'',html:`<div style="width:12px;height:12px;border-radius:50%;background:${s.color};border:2px solid rgba(255,255,255,.25);box-shadow:0 0 10px ${s.color}55"></div>`,iconSize:[12,12],iconAnchor:[6,6]});
+    L.marker([s.lat,s.lng],{icon}).bindPopup(`<div class="pop-title">${s.label}</div><div style="font-size:11px;color:#88aab8">${s.desc}</div>`,{className:'gis-popup',maxWidth:240}).addTo(lg);
+  });
+  lg.addTo(wmap);
+  activeSiteLayer = lg;
+}
+
+// GEE Tile URL input handler
+function applyGEETile(inputId, layerId){
+  const url = document.getElementById(inputId)?.value?.trim();
+  if(!url){return;}
+  if(geeTileLayers[layerId]) wmap.removeLayer(geeTileLayers[layerId]);
+  geeTileLayers[layerId] = L.tileLayer(url,{opacity:0.75,maxZoom:18}).addTo(wmap);
+}
+
+// ══════════════════════════════════════════
+// CHART HELPERS
+// ══════════════════════════════════════════
+Chart.defaults.color='rgba(200,225,240,.5)';
+function chartOpts(){return{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#0a1628',borderColor:'rgba(0,212,255,.2)',borderWidth:1,titleColor:'#00d4ff',bodyColor:'#aac'}},scales:{x:{grid:{color:'rgba(0,212,255,.05)'},ticks:{color:'rgba(200,225,240,.35)',font:{size:9}}},y:{grid:{color:'rgba(0,212,255,.05)'},ticks:{color:'rgba(200,225,240,.35)',font:{size:9}}}}};}
+function mkLine(id,labels,data,color,label=''){const c=document.getElementById(id);if(c)new Chart(c,{type:'line',data:{labels,datasets:[{data,borderColor:color,backgroundColor:color+'15',borderWidth:1.5,fill:true,tension:.4,pointRadius:2,pointBackgroundColor:color,label}]},options:chartOpts()});}
+function mkBar(id,labels,data,color){const c=document.getElementById(id);if(!c)return;const colors=Array.isArray(color)?color:labels.map(()=>color);new Chart(c,{type:'bar',data:{labels,datasets:[{data,backgroundColor:colors.map(c=>c+'88'),borderColor:colors,borderWidth:1,borderRadius:2}]},options:chartOpts()});}
+
+// ══════════════════════════════════════════
+// SWITCH PROJECT
+// ══════════════════════════════════════════
+let currentCharts = [];
+function switchProject(key, el){
+  document.querySelectorAll('.proj-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  const p = projects[key];
+  const lang = document.getElementById('lid').classList.contains('active') ? 'id' : 'en';
+
+  // Map
+  wmap.setView(p.center, p.zoom);
+  document.getElementById('map-proj-title').textContent = lang==='id' ? p.titleID : p.titleEN;
+  document.getElementById('map-proj-sub').textContent   = lang==='id' ? p.subID   : p.subEN;
+  document.getElementById('bot-dataset').textContent    = p.botDataset;
+
+  // Right panel
+  document.getElementById('rp-title').textContent = lang==='id' ? p.rpTitleID : p.rpTitleEN;
+  document.getElementById('rp-sub').textContent   = lang==='id' ? p.rpSubID   : p.rpSubEN;
+  const rBody = document.getElementById('rp-body');
+  rBody.innerHTML = p.rpHTML();
+  setTimeout(()=>{ currentCharts.forEach(c=>{try{c.destroy();}catch(e){}});  p.renderCharts(); }, 50);
+
+  // Legend
+  document.getElementById('map-legend').innerHTML = p.legend;
+
+  // Stats
+  document.getElementById('ip-grid').innerHTML = p.stats.map(s=>`
+    <div class="ip-card">
+      <div class="ip-val" style="color:${s.color}">${s.val}</div>
+      <div class="ip-lbl">${s.label}</div>
+    </div>`).join('');
+
+  // Layer panel
+  document.getElementById('layer-panel').innerHTML = `
+    <div class="proj-desc">
+      <div class="pd-title">${lang==='id' ? p.titleID : p.titleEN}</div>
+      <div class="pd-txt">${lang==='id' ? p.subID : p.subEN}</div>
+      <div class="pd-chips">${p.datasets.map(d=>`<span class="chip">${d}</span>`).join('')}</div>
+    </div>
+    ${p.layers.map(l=>`
+      <div class="li ${l.on?'on':''}" onclick="this.classList.toggle('on');this.querySelector('.tog').classList.toggle('on')">
+        <div class="li-dot" style="background:${l.color};min-width:10px;height:10px;border-radius:3px;flex-shrink:0"></div>
+        <div style="flex:1">
+          <div class="li-lbl">${lang==='id' ? l.label : l.labelEN}</div>
+          <div class="li-src">${l.src}</div>
+        </div>
+        <div class="tog ${l.on?'on':''}"></div>
+      </div>`).join('')}`;
+
+  // GEE tab
+  document.getElementById('gee-inputs').innerHTML = p.geeInputs.map(inp=>`
+    <div style="margin-bottom:10px">
+      <div style="font-size:10px;color:var(--txt3);margin-bottom:4px">${inp.label}</div>
+      <div style="display:flex;gap:6px">
+        <input id="${inp.id}" type="text" placeholder="Paste tile URL dari GEE Console..."
+          style="flex:1;background:var(--raised);border:1px solid var(--border);border-radius:5px;padding:5px 8px;color:var(--txt);font-size:11px;font-family:var(--mono);outline:none;">
+        <button onclick="applyGEETile('${inp.id}','${inp.id}')"
+          style="padding:5px 10px;background:rgba(0,212,255,.1);border:1px solid var(--accent);color:var(--accent);border-radius:5px;cursor:pointer;font-size:11px;">Terapkan</button>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('gee-datasets').innerHTML = p.datasets.map(d=>`
+    <div class="li"><div class="li-dot" style="background:var(--accent)"></div><div class="li-lbl" style="font-size:11px">${d}</div></div>`).join('');
+
+  // Markers
+  buildSiteLayer(key);
+}
+
+// ══════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════
+function showTab(name,el){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.s-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  el.classList.add('active');
+}
+
+// ══════════════════════════════════════════
+// LANGUAGE
+// ══════════════════════════════════════════
+function setLang(lang){
+  document.getElementById('lid').classList.toggle('active',lang==='id');
+  document.getElementById('len').classList.toggle('active',lang==='en');
+  // Re-render current project with new lang
+  const activeTab = document.querySelector('.proj-tab.active');
+  if(activeTab) activeTab.click();
+}
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+document.querySelector('.proj-tab').click();
+
+// Popup styles
+const ps = document.createElement('style');
+ps.textContent=`.gis-popup .leaflet-popup-content-wrapper{background:#0a1628;border:1px solid rgba(0,212,255,.2);border-radius:8px;color:#e8f4f8;}.gis-popup .leaflet-popup-tip{background:#0a1628;}`;
+document.head.appendChild(ps);
+</script>
+</body>
+</html>
